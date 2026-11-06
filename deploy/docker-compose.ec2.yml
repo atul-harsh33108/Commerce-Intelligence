@@ -1,0 +1,76 @@
+# Deployment overlay for a single public host.
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.ec2.yml \
+#                  --profile apps --profile observability up -d
+#
+# An OVERLAY, not a second stack. Compose merges files left to right, so everything here is a delta
+# against the compose file that already runs locally — and that is the point the roadmap made for
+# Step 12: "one code base, two environments, Spring profiles and env vars only, never a second copy
+# of the code". A separate `docker-compose.prod.yml` containing all 27 services would be that second
+# copy, and it would drift from the first the week after it was written.
+#
+# WHY THESE PARTICULAR PORTS. The host's security group allows exactly five inbound ports from one
+# address: 22, 30080, 30081, 30090, 30300. They are in the Kubernetes NodePort range because the
+# machine previously ran k3s. Rather than open new ports — every one of which is a firewall rule
+# somebody has to justify later — the four services that need to be reachable are bound to the four
+# that already exist. Everything else keeps its internal port and is reachable only from inside the
+# compose network, which is the same shape the Kubernetes manifests have: one Ingress, eight
+# ClusterIP services.
+
+services:
+
+  api-gateway:
+    ports: ["30080:8080"]
+    environment:
+      # The SPA is served from :30081, so that origin has to be allowed or every authenticated
+      # request from the page fails its preflight. `${PUBLIC_HOST}` is supplied by deploy.sh.
+      #
+      # This is exactly the value of having made the origin list an environment variable rather than
+      # a literal in config-repo: a deployment on a new host is a variable, not an edit.
+      CORS_ALLOWED_ORIGINS: "http://${PUBLIC_HOST}:30081"
+
+  storefront:
+    build:
+      # `.` and not `..`, and the difference is not obvious. Compose resolves relative paths in an
+      # OVERRIDE file against the PROJECT directory - the directory of the first `-f` file - not
+      # against the override's own location. With `context: ..` the build tried to read
+      # /home/ubuntu and failed with `lstat /home/ubuntu/deploy: no such file or directory`, after
+      # spending four minutes building the nine service images first.
+      context: .
+      dockerfile: deploy/Dockerfile.storefront
+      args:
+        # Baked into the bundle at build time — see the comment in Dockerfile.storefront.
+        VITE_API_BASE: "http://${PUBLIC_HOST}:30080"
+    image: ecommerce/storefront:local
+    container_name: ecommerce-storefront
+    profiles: ["apps"]
+    ports: ["30081:80"]
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy: { resources: { limits: { memory: 128M } } }
+
+  prometheus:
+    ports: ["30090:9090"]
+
+  grafana:
+    ports: ["30300:3000"]
+    environment:
+      # Grafana builds absolute URLs from this. Left at localhost, every link it generates points at
+      # the viewer's own machine instead of the server.
+      GF_SERVER_ROOT_URL: "http://${PUBLIC_HOST}:30300"
+
+  # ---------------------------------------------------------------------------------------------
+  # NOT EXPOSED, deliberately: user/catalog/inventory/order/payment/search, the five Postgres
+  # instances, MySQL, Kafka, Redis, Elasticsearch, Zipkin, and the config and discovery servers.
+  #
+  # Every one of them is reachable on the compose network by name and from nowhere else. The
+  # services still verify every JWT themselves, so this is defence in depth rather than the only
+  # control — but it means a mistake in a filter chain is not immediately an internet-facing
+  # mistake.
+  #
+  # Zipkin in particular would be useful to expose and is not: it has no authentication of any kind
+  # and its traces contain order keys and user ids. Reaching it needs an SSH tunnel:
+  #
+  #   ssh -L 9411:localhost:9411 ubuntu@<host>
+  # ---------------------------------------------------------------------------------------------
