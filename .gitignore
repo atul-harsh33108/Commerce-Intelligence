@@ -1,0 +1,74 @@
+# Build output
+target/
+build/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+
+# IDE
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Secrets and local environment
+.env
+*.local.yaml
+*.local.yml
+agent/backend/conf/app_config.local.yaml
+
+# Data. The Olist CSVs are third-party data under CC BY-NC-SA and are not redistributable from
+# this repository; the generated ones are reproducible from a seed.
+#
+# THE WHOLE `data/` TREE, not `data/olist/*.csv`. The narrow pattern was what I had, and it failed
+# the moment the download was unzipped one directory higher than expected - 164 MB of CSVs and a
+# 44 MB archive.zip went into a commit. `git status` showed them as ordinary untracked files
+# because they were, and `git add -A` took them.
+#
+# An ignore rule has to cover where files ACTUALLY land, not where the instructions said to put them.
+data/**
+!data/.gitkeep
+
+# Benchmark datasets (Spider is ~100 MB, downloaded on demand)
+eval/spider/database/
+eval/spider/*.json
+!eval/spider/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# dev-stack.ps1 process logs
+.logs/
+
+# Evaluation reports: keep them, they are the evidence for the accuracy numbers.
+# (They are small JSON and re-running costs an LLM budget, so they are worth committing.)
+
+# Frontend build output and dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Local tooling scaffolding and build-process notes - not part of the project
+.claude/
+CLAUDE.md
+PROMPT.md
