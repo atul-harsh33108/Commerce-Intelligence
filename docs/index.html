@@ -1,0 +1,890 @@
+<title>Olist Platform Build Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+
+<style>
+:root{
+  --ground:#fafafb;
+  --surface:#ffffff;
+  --surface-2:#f2f3f6;
+  --ink:#191c22;
+  --muted:#646b7a;
+  --line:#e0e3ea;
+  --accent:#2c6a89;
+  --accent-soft:#e6eff4;
+  --signal:#9a5209;
+  --signal-soft:#fbf0e2;
+  --good:#1c6b52;
+  --good-soft:#e4f1eb;
+  --shadow:0 1px 2px rgba(20,26,38,.05),0 8px 24px -12px rgba(20,26,38,.15);
+
+  --f-display:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#121419;
+    --surface:#181b21;
+    --surface-2:#1f232b;
+    --ink:#e7eaf0;
+    --muted:#98a0b0;
+    --line:#2a2f39;
+    --accent:#68b0d0;
+    --accent-soft:#16303d;
+    --signal:#e0a462;
+    --signal-soft:#33240f;
+    --good:#63c39d;
+    --good-soft:#122e24;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#121419;
+  --surface:#181b21;
+  --surface-2:#1f232b;
+  --ink:#e7eaf0;
+  --muted:#98a0b0;
+  --line:#2a2f39;
+  --accent:#68b0d0;
+  --accent-soft:#16303d;
+  --signal:#e0a462;
+  --signal-soft:#33240f;
+  --good:#63c39d;
+  --good-soft:#122e24;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:17px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px 120px}
+.col{max-width:68ch}
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0}
+a{color:var(--accent)}
+code{font-family:var(--f-mono);font-size:.87em;background:var(--surface-2);padding:.1em .35em;border-radius:3px;border:1px solid var(--line)}
+strong{font-weight:600}
+.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- masthead ---------- */
+header.top{padding:76px 0 46px;border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 22px
+}
+h1{font-size:clamp(38px,6.4vw,66px);line-height:1.02;letter-spacing:-.025em;font-weight:700}
+.standfirst{font-size:20px;line-height:1.55;color:var(--muted);margin:22px 0 0;max-width:60ch}
+.byline{
+  font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:30px;
+  display:flex;flex-wrap:wrap;gap:8px 22px
+}
+
+/* ---------- key figures ---------- */
+.figures{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px;background:var(--line);border:1px solid var(--line);margin:44px 0 0
+}
+.fig{background:var(--surface);padding:20px 18px}
+.fig dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.fig dd{
+  margin:8px 0 0;font-family:var(--f-display);font-size:27px;font-weight:600;
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1
+}
+.fig dd span{font-size:14px;font-weight:400;color:var(--muted);display:block;margin-top:5px;letter-spacing:0}
+
+/* ---------- sections ---------- */
+section{padding-top:74px}
+.sec-head{display:flex;align-items:baseline;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:34px}
+.sec-num{font-family:var(--f-mono);font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.08em}
+h2{font-size:clamp(25px,3.4vw,34px);letter-spacing:-.02em;font-weight:600}
+h3{font-size:20px;font-weight:600;margin:44px 0 12px;letter-spacing:-.012em}
+p{margin:0 0 17px}
+.lead{font-size:18.5px}
+
+/* ---------- phase timeline ---------- */
+.phases{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line)}
+.phase{
+  display:grid;grid-template-columns:64px 1fr 160px;gap:22px;align-items:start;
+  padding:18px 4px;border-bottom:1px solid var(--line)
+}
+.phase-n{
+  font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--muted);
+  padding-top:2px;font-variant-numeric:tabular-nums
+}
+.phase-t{font-family:var(--f-display);font-weight:600;font-size:16.5px;line-height:1.35}
+.phase-t small{display:block;font-weight:400;font-size:14.5px;color:var(--muted);margin-top:5px;font-family:var(--f-body);line-height:1.5}
+.phase-r{
+  font-family:var(--f-mono);font-size:12.5px;color:var(--good);text-align:right;
+  padding-top:3px;font-variant-numeric:tabular-nums;line-height:1.5
+}
+.phase.star .phase-n{color:var(--signal)}
+@media(max-width:720px){
+  .phase{grid-template-columns:40px 1fr;gap:14px}
+  .phase-r{grid-column:2;text-align:left;padding-top:8px}
+}
+
+/* ---------- evidence / terminal ---------- */
+.evidence{
+  background:var(--surface);border:1px solid var(--line);border-radius:5px;
+  margin:22px 0 26px;overflow:hidden;box-shadow:var(--shadow)
+}
+.evidence-h{
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)
+}
+.evidence pre{
+  margin:0;padding:16px;overflow-x:auto;font-family:var(--f-mono);font-size:12.5px;
+  line-height:1.72;color:var(--ink)
+}
+.evidence pre b{color:var(--signal);font-weight:500}
+.evidence pre i{color:var(--good);font-style:normal}
+.evidence pre u{color:var(--muted);text-decoration:none}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;margin:22px 0 28px;border:1px solid var(--line);border-radius:5px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-family:var(--f-display);font-size:14.5px}
+th{
+  text-align:left;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:500;padding:12px 16px;border-bottom:1px solid var(--line);
+  background:var(--surface-2);white-space:nowrap
+}
+td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.big{font-weight:600;color:var(--ink)}
+.delta{color:var(--good);font-family:var(--f-mono);font-size:13px;white-space:nowrap}
+.was{color:var(--muted);text-decoration:line-through}
+
+/* ---------- bug cards ---------- */
+.bug{
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--signal);
+  border-radius:0 5px 5px 0;padding:22px 24px;margin:0 0 18px;box-shadow:var(--shadow)
+}
+.bug-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.bug-h h4{font-size:17.5px;font-weight:600;letter-spacing:-.01em;flex:1;min-width:240px}
+.tag{
+  font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 8px;border-radius:3px;white-space:nowrap;font-weight:500
+}
+.tag-where{background:var(--accent-soft);color:var(--accent)}
+.tag-ghost{background:var(--signal-soft);color:var(--signal)}
+.bug dl{margin:0;display:grid;grid-template-columns:78px 1fr;gap:10px 16px;align-items:baseline}
+.bug dt{
+  font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);padding-top:3px
+}
+.bug dd{margin:0;font-size:15.5px;line-height:1.6}
+.bug dd .mono{font-size:13px;color:var(--signal)}
+@media(max-width:640px){
+  .bug dl{grid-template-columns:1fr;gap:4px 0}
+  .bug dt{margin-top:10px}
+}
+
+/* ---------- callout ---------- */
+.callout{
+  background:var(--accent-soft);border:1px solid var(--line);border-radius:5px;
+  padding:24px 26px;margin:30px 0
+}
+.callout h3{margin:0 0 12px;font-size:18px;color:var(--ink)}
+.callout p:last-child{margin-bottom:0}
+.callout .mono{font-size:13.5px}
+
+/* ---------- misc lists ---------- */
+ul.tight{margin:0 0 18px;padding-left:20px}
+ul.tight li{margin-bottom:9px}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 26px}
+.pill{
+  font-family:var(--f-mono);font-size:12px;padding:5px 11px;border:1px solid var(--line);
+  border-radius:20px;color:var(--muted);background:var(--surface)
+}
+footer{margin-top:80px;padding-top:26px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Build record · 10–20 August 2026</p>
+  <h1>Olist Platform<br>Build Log</h1>
+  <p class="standfirst">
+    Fourteen steps, twenty-five bugs, and one lesson that turned up nine separate times. An
+    e-commerce microservices platform on 481,000 rows of real Brazilian marketplace data, feeding a
+    star-schema warehouse queried in plain English — built, measured, deployed, and documented
+    including the parts that broke.
+  </p>
+  <p class="byline">
+    <span>Java 21 · Spring Boot 3.5 · PostgreSQL + MySQL</span>
+    <span>Kafka · Redis · Elasticsearch · Debezium</span>
+    <span>Python LangGraph · React 19</span>
+  </p>
+
+  <dl class="figures">
+    <div class="fig"><dt>Roadmap steps</dt><dd>14 / 14<span>all complete</span></dd></div>
+    <div class="fig"><dt>Rows loaded</dt><dd>481K<span>in 24.9 s</span></dd></div>
+    <div class="fig"><dt>Agent accuracy</dt><dd>97.0%<span>from 78.8%</span></dd></div>
+    <div class="fig"><dt>Bugs recorded</dt><dd>25<span>with evidence</span></dd></div>
+    <div class="fig"><dt>CI</dt><dd>6 / 6<span>green</span></dd></div>
+    <div class="fig"><dt>Deployed</dt><dd>AWS<span>18/18 verified</span></dd></div>
+  </dl>
+</header>
+
+<!-- ================= 1 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">01</span><h2>What was built</h2></div>
+  <div class="col">
+    <p class="lead">
+      Two halves that meet at a warehouse. A transactional platform on PostgreSQL — nine Spring Boot
+      services, each owning its own database — and an analytical read path on MySQL that a Python
+      agent queries in English. Nothing crosses between them by a database connection; only by change
+      events.
+    </p>
+    <p>
+      The data is real. Olist is a Brazilian marketplace that published 100,000 anonymised orders,
+      and every count in this document was produced by loading those CSVs, not by generating
+      plausible ones. That matters more than it sounds: several bugs here were only reachable with
+      real data, because synthetic data is too well-behaved.
+    </p>
+  </div>
+
+  <div class="pill-row" style="margin-top:26px">
+    <span class="pill">Spring Cloud Gateway</span>
+    <span class="pill">Eureka</span>
+    <span class="pill">Config Server</span>
+    <span class="pill">Resilience4j</span>
+    <span class="pill">Transactional outbox</span>
+    <span class="pill">Choreographed saga</span>
+    <span class="pill">Debezium CDC</span>
+    <span class="pill">Star schema</span>
+    <span class="pill">LangGraph NL→SQL</span>
+    <span class="pill">Qdrant</span>
+    <span class="pill">Zipkin tracing</span>
+    <span class="pill">Prometheus + Grafana</span>
+  </div>
+
+  <div class="col">
+    <p>
+      Three ground rules shaped every decision. <strong>Spring-native only</strong> — no Spring Cloud
+      Alibaba, because the job market this targets asks about Eureka and Gateway.
+      <strong>Two database engines, deliberately</strong> — PostgreSQL for transactions, MySQL for the
+      warehouse, because a cross-engine gap is what makes change-data-capture necessary rather than a
+      copy job. And <strong>never provision cloud resources</strong>: the AWS equivalents are mapped in
+      the docs and the Kubernetes manifests are written, but nothing in the repository creates a
+      billable thing.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">02</span><h2>The steps, and what each produced</h2></div>
+  <div class="col">
+    <p>
+      Every step ended with a number produced by a script in <code>scripts/</code>, not an assertion in a
+      document. Steps marked in amber were the ones that carried the actual weight — the rest ported
+      known ground quickly.
+    </p>
+  </div>
+
+  <div class="phases">
+    <div class="phase">
+      <div class="phase-n">00</div>
+      <div class="phase-t">Skeleton
+        <small>Config server, Eureka, gateway. Infrastructure first, because nothing else starts without config.</small>
+      </div>
+      <div class="phase-r">builds, registers</div>
+    </div>
+    <div class="phase">
+      <div class="phase-n">01</div>
+      <div class="phase-t">Walking skeleton
+        <small>One service end to end on a real PostgreSQL via Testcontainers.</small>
+      </div>
+      <div class="phase-r">13 tests</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">02 ★</div>
+      <div class="phase-t">Real data ingestion
+        <small>An idempotent loader for nine Olist CSVs across five databases.</small>
+      </div>
+      <div class="phase-r">481K rows · 24.9 s<br>counts match exactly</div>
+    </div>
+    <div class="phase">
+      <div class="phase-n">03–04</div>
+      <div class="phase-t">Five bounded contexts + Spring Cloud
+        <small>JWT at the edge and again in every service; Resilience4j circuit breakers.</small>
+      </div>
+      <div class="phase-r">18/18 checks<br>6.55 s → 0.014 s</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">05 ★</div>
+      <div class="phase-t">Transactional outbox + saga
+        <small>Order and event committed in one transaction; a relay publishes; compensation on failure.</small>
+      </div>
+      <div class="phase-r">8 fault-injection tests<br>39 ms to durable</div>
+    </div>
+    <div class="phase">
+      <div class="phase-n">06</div>
+      <div class="phase-t">Redis caching + rate limiting
+        <small>Cache-aside on the catalogue, token bucket at the gateway.</small>
+      </div>
+      <div class="phase-r">98.8% of queries removed<br><span class="was">99.6%</span> re-measured</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">07 ★</div>
+      <div class="phase-t">Elasticsearch search
+        <small>A read model fed by events; typo- and Portuguese-tolerant, faceted.</small>
+      </div>
+      <div class="phase-r">32,951 docs<br>942 ms write→searchable</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">08 ★</div>
+      <div class="phase-t">CDC → star-schema warehouse
+        <small>Debezium reads PostgreSQL's write-ahead log into a MySQL star schema.</small>
+      </div>
+      <div class="phase-r">344K events · 749/s<br>median lag 495 ms</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">09 ★★</div>
+      <div class="phase-t">NL→SQL agent integration
+        <small>An existing LangGraph agent pointed at this warehouse — configuration, not a rewrite.</small>
+      </div>
+      <div class="phase-r">3/3 correct<br>31 metadata checks</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">10 ★</div>
+      <div class="phase-t">Evaluation
+        <small>33 hand-written questions, execution accuracy, failure analysis.</small>
+      </div>
+      <div class="phase-r">78.8% → 97.0%</div>
+    </div>
+    <div class="phase">
+      <div class="phase-n">11</div>
+      <div class="phase-t">React storefront
+        <small>Browse, cart, checkout, live saga tracker, streaming analytics panel.</small>
+      </div>
+      <div class="phase-r">browser purchase<br>1,289 ms settle</div>
+    </div>
+    <div class="phase">
+      <div class="phase-n">12</div>
+      <div class="phase-t">Containers, Kubernetes, CI
+        <small>One Dockerfile for nine services, 44 k8s objects, six-job GitHub Actions pipeline.</small>
+      </div>
+      <div class="phase-r">9/9 images<br>44 objects valid</div>
+    </div>
+    <div class="phase">
+      <div class="phase-n">13</div>
+      <div class="phase-t">Observability
+        <small>Prometheus, Grafana, Zipkin — and the trace carried across the outbox.</small>
+      </div>
+      <div class="phase-r">20 spans · 4 services</div>
+    </div>
+    <div class="phase star">
+      <div class="phase-n">14 ★</div>
+      <div class="phase-t">Deployed to AWS
+        <small>An EC2 t3.xlarge already owned. No managed services created.</small>
+      </div>
+      <div class="phase-r">22 containers<br>18/18 verified</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">03</span><h2>The one lesson, nine times</h2></div>
+
+  <div class="col">
+    <p class="lead">
+      Nine separate bugs across this project shared a single shape: <strong>a check that confirmed
+      something was <em>running</em> rather than that it <em>worked</em>.</strong> Each one passed the
+      check that was actually being performed, and failed the thing the check was supposed to be
+      about.
+    </p>
+    <p>
+      That pattern is the most useful thing the project produced, and it is worth stating before the
+      individual bugs, because the individual bugs are only interesting as instances of it.
+    </p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>The thing that looked fine</th><th>What it was actually doing</th></tr></thead>
+      <tbody>
+        <tr><td>Debezium connectors reporting <code>RUNNING</code></td><td>Producing nothing — topic auto-creation was disabled</td></tr>
+        <tr><td>A CDC sink consuming happily</td><td>Never committing on a quiet stream</td></tr>
+        <tr><td>An Elasticsearch index with 32,951 documents</td><td>Built by dynamic mapping; every annotation silently ignored</td></tr>
+        <tr><td>A Redis cache at <strong>100% hit rate</strong></td><td>Every hit throwing <code>ClassCastException</code></td></tr>
+        <tr><td>A benchmark reporting <strong>−23% p50 latency</strong></td><td>Timing HTTP 500s, which are fast</td></tr>
+        <tr><td><code>kubectl apply --dry-run=client</code> passing</td><td>Quietly contacting a cluster that only existed on my laptop</td></tr>
+        <tr><td>13 integration tests passing</td><td>Using a Redis that nothing in the test config declared</td></tr>
+        <tr><td><code>docker compose ps</code> all healthy</td><td>Gateway unreachable from the host it ran on</td></tr>
+        <tr><td><code>depends_on: service_started</code> satisfied</td><td>Container existed; process could not yet serve</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <h3>The corollary that changed how I write scripts</h3>
+    <p>
+      <strong>A measurement instrument that cannot fail is not a measurement.</strong>
+      <code>cache_benchmark.py</code> caught <code>HTTPError</code>, read the body to keep the connection
+      tidy, and returned the elapsed time anyway. It would have reported the same improvement against
+      a service that returned 500 to everything — and for four steps, that is exactly what it did.
+      It now refuses to report a latency for any batch that was not entirely HTTP 200.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">04</span><h2>The problems, in order of what they cost</h2></div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>A cache in which every hit failed — and two instruments that agreed it was fine</h4>
+      <span class="tag tag-where">Step 6</span><span class="tag tag-ghost">Looked healthy</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd>First read of a product: <span class="mono">200</span>. Every read after: <span class="mono">401 "Authentication required"</span> — on a public endpoint, for a full ten-minute TTL.</dd>
+      <dt>Cause</dt>
+      <dd><code>GenericJackson2JsonRedisSerializer</code>'s no-argument constructor enables the default typing that writes <code>@class</code>. Passing your own <code>ObjectMapper</code> uses it exactly as given, so nothing recorded the type and every read came back a <code>LinkedHashMap</code>. A cache <em>miss</em> worked; a cache <em>hit</em> threw. The precise inverse of a cache.</dd>
+      <dt>Hidden by</dt>
+      <dd>Three things at once. The benchmark timed error responses. Redis's own hit counter counts lookups, not usable values. And <code>/error</code> was not permitted in the filter chain, so Spring's internal error forward was rejected and the 500 was rendered as a 401 — wrong status, wrong reason, wrong subsystem.</dd>
+      <dt>Found by</dt>
+      <dd>Opening the storefront in a browser. React StrictMode double-invokes effects in development, so the product page fetched the same product twice. Four steps of <code>curl</code> never did, because curl asks once.</dd>
+      <dt>Fix</dt>
+      <dd>One typed serializer per cache rather than re-enabling default typing — which would let the deserialiser instantiate whatever class name it finds in Redis. Plus the benchmark now checks status, and all six services permit <code>/error</code>. <strong>Step 6's published numbers were corrected: 98.8% of queries removed, not 99.6%.</strong></dd>
+    </dl>
+  </div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>Spring's self-invocation trap</h4>
+      <span class="tag tag-where">Step 5</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd><span class="mono">"no transaction is known to be in progress"</span>, twice a second, forever.</dd>
+      <dt>Cause</dt>
+      <dd>The outbox relay's <code>@Scheduled</code> method called its own <code>@Transactional</code> method. Spring's proxy only intercepts calls arriving from outside the bean, so an internal call bypasses it entirely and the annotation does nothing.</dd>
+      <dt>Fix</dt>
+      <dd>Split into two beans — <code>OutboxRelay</code> owns the timer, <code>OutboxPublisher</code> owns the unit of work. The call now crosses a proxy boundary.</dd>
+    </dl>
+  </div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>An index that was 80% working</h4>
+      <span class="tag tag-where">Step 7</span><span class="tag tag-ghost">Looked healthy</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd><span class="mono">q=computr → 30 hits</span> (fuzzy matching worked) but <span class="mono">q=health beauty → 0 hits</span>, against 32,951 indexed documents.</dd>
+      <dt>Cause</dt>
+      <dd><code>@Document</code>, <code>@Setting</code> and <code>@MultiField</code> <em>describe</em> an index; they do not create one. Calling <code>save()</code> against a missing index lets Elasticsearch create it first by dynamic mapping, and every annotation is silently dropped. Single-word queries worked because the default analyser handles them — so the service looked healthy, and I had already written "search works" in my notes.</dd>
+      <dt>Also learned</dt>
+      <dd>Underscore is not a word boundary to the standard tokenizer, so <code>health_beauty</code> is one token and needs a <code>char_filter</code> — which must run <em>before</em> tokenisation. All 71 Olist categories are underscore-joined. And an analyser cannot be altered in place: there is no ALTER, only delete, recreate, reindex.</dd>
+      <dt>Fix</dt>
+      <dd>Create the index explicitly with <code>createWithMapping()</code>, and log an error at startup if an existing index's settings do not mention the analyser. Three lines that would have replaced half a day.</dd>
+    </dl>
+  </div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>27% of the warehouse pointing at "Unknown"</h4>
+      <span class="tag tag-where">Step 8</span><span class="tag tag-ghost">Real data only</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd><strong>30,635 of 112,652 facts</strong> had no geography — invisible until the real dataset was loaded.</dd>
+      <dt>Cause</dt>
+      <dd>A late-arriving dimension. <code>geography_id</code> is derived from the customer's state, and it was resolved once, at the moment the fact was built — when the customer row was still a stub with no state yet.</dd>
+      <dt>Fix</dt>
+      <dd>A <code>reconcile_geography()</code> pass after dimensions settle. 30,635 → <strong>2</strong>.</dd>
+    </dl>
+  </div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>A documented command that had never been run</h4>
+      <span class="tag tag-where">Step 12</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd><code>docker compose --profile apps up -d</code> appeared in the README and in the compose file's own header. <strong>There was no <code>apps</code> profile.</strong> It starts the databases, starts no service, and reports success — Compose does not warn about a profile nothing declares.</dd>
+      <dt>Cause</dt>
+      <dd>Written at Step 0 and wrong from that moment. Nothing caught it in twelve steps because the platform was always started the <em>other</em> documented way, so the broken command was never the one anybody typed.</dd>
+      <dt>Fix</dt>
+      <dd>An actual profile, verified by stopping every host JVM first so a service answering could not have been the old process. Also found <code>--profile obs</code> advertised in the same comment block, where the profile is called <code>observability</code>. Every profile named anywhere is now checked mechanically.</dd>
+    </dl>
+  </div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>A config change that did nothing, twice, for two different silent reasons</h4>
+      <span class="tag tag-where">Step 10</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd>Two metadata fixes applied to the agent, and the evaluation score did not move at all.</dd>
+      <dt>Cause</dt>
+      <dd>Two independent causes stacked. <code>conf/</code> is <code>COPY</code>ed into the image, so host edits were invisible to the running container. And behind that, a warm Redis retrieval cache — 717 keys — was serving the old answers anyway.</dd>
+      <dt>Fix</dt>
+      <dd>Mount the config read-only instead of baking it in, and flush the retrieval cache (database 1, never database 0) in the rebuild script. <strong>Accuracy then moved 78.8% → 97.0%.</strong></dd>
+    </dl>
+  </div>
+
+  <div class="bug">
+    <div class="bug-h">
+      <h4>The trace stops at the broker — and four healthy-looking traces are worse than none</h4>
+      <span class="tag tag-where">Step 13</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd>One order produced <strong>four disconnected traces</strong>, each of which looked perfectly healthy on its own. "What happened to this order" had no answer.</dd>
+      <dt>Cause</dt>
+      <dd>A trace context lives on a thread. The outbox exists precisely to move publishing <em>off</em> the request thread — different thread, different transaction, up to 500 ms later — so the relay's scheduled tick starts a fresh trace and every downstream consumer attaches to that instead.</dd>
+      <dt>Fix</dt>
+      <dd>Store the W3C <code>traceparent</code> in the outbox row and re-open a span parented to it before publishing. Not the easier fix of copying the header onto the record: Spring Kafka injects one during <code>send()</code> too, and a record with two <code>traceparent</code> headers is honoured differently by different consumers.</dd>
+      <dt>Bonus</dt>
+      <dd>Restoring the context produces a visible <code>outbox publish</code> span, so the pattern's cost stops being an argument and becomes a gap you can measure — <strong>~250 ms of a 608 ms saga is waiting for a relay poll.</strong></dd>
+    </dl>
+  </div>
+
+  <h3 style="margin-top:52px">What continuous integration found on its first three runs</h3>
+  <div class="col">
+    <p>
+      The pipeline had been written at Step 12 and never executed, because the project's rule was
+      local commits only. When the repository went public it ran for the first time — and failed
+      three times in a row, each time on something that <em>could not fail on the machine that wrote
+      it</em>.
+    </p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Run</th><th>Failure</th><th>Why it passed locally</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="n">1</td>
+          <td><code>./mvnw: Permission denied</code> (exit 126)</td>
+          <td>Git tracks the executable bit; Windows filesystems do not. Fixed with <code>git update-index --chmod=+x</code>, the only way to set it from Windows.</td>
+        </tr>
+        <tr>
+          <td class="n">1</td>
+          <td><code>failed to download openapi: connection refused</code></td>
+          <td><code>kubectl --dry-run=client</code> is <strong>not offline</strong> — it fetches the schema from an API server. It passed here only because a kubeconfig pointed at Docker Desktop. Replaced with <code>kubeconform -strict</code>, which also rejects unknown fields the dry run accepts.</td>
+        </tr>
+        <tr>
+          <td class="n">2</td>
+          <td>All 13 catalog tests error in ~1 ms</td>
+          <td><strong>Broken since Step 7.</strong> A <code>@Value</code> placeholder lived only in the config server, which the test profile deliberately never reads. Unnoticed because every build in between was <code>-DskipTests</code>, while the docs displayed "13 tests, 0 failures" with a five-step-stale date.</td>
+        </tr>
+        <tr>
+          <td class="n">3</td>
+          <td><code>Unable to connect to Redis</code>, 5 of 13</td>
+          <td><code>@Cacheable</code> means every read path does a cache lookup. A Redis container from <code>docker compose</code> was always listening on 6379, so the tests used a service nothing declared. Fixed with a Redis testcontainer — and verified by stopping the local one first.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:52px">What the AWS deployment found</h3>
+  <div class="col">
+    <p>
+      Four more, all of which passed locally <em>and</em> in CI, because all four were claims that
+      stopped being true away from one machine.
+    </p>
+    <ul class="tight">
+      <li><strong>CORS origins hardcoded to <code>localhost</code>.</strong> A storefront on any real host fails every preflight, with a browser console message naming neither the gateway nor the deployment.</li>
+      <li><strong>A required-variable guard made every other profile undeployable.</strong> The agent declared <code>${GEMINI_API_KEY:?}</code>, and Compose interpolates the whole file <em>before</em> reading profiles — so <code>--profile apps</code>, which involves no agent, refused to start. The evidence had been in the repository for weeks: CI passed <code>dummy-for-validation</code> to work around our own guard, and nobody asked why.</li>
+      <li><strong><code>context: ..</code> in an override file.</strong> Compose resolves relative paths against the <em>project</em> directory, not the override that declares them — discovered after four minutes spent building the nine images that came first.</li>
+      <li><strong><code>depends_on: service_started</code> is not readiness.</strong> The gateway launched when config-server's container existed rather than when it could serve, exhausted ~21 s of retry backoff, and exited 1. Compose then refused to start five dependents, so the visible symptom pointed at the last thing to fail instead of the first.</li>
+    </ul>
+  </div>
+
+  <div class="bug" style="border-left-color:var(--accent)">
+    <div class="bug-h">
+      <h4>And one that belonged to the host, not the project</h4>
+      <span class="tag tag-where">Deployment</span>
+    </div>
+    <dl>
+      <dt>Symptom</dt>
+      <dd>The site served traffic perfectly <strong>from the internet</strong> and was unreachable <strong>from the machine running it</strong>. Every container healthy; the smoke test could not connect.</dd>
+      <dt>Evidence</dt>
+      <dd class="mono">curl -6 [::1]:30080 → 200<br>curl -4 127.0.0.1:30080 → refused</dd>
+      <dt>Cause</dt>
+      <dd>The host previously ran k3s. <code>systemctl disable --now k3s</code> stops the service and leaves its netfilter state entirely intact — <strong>510 <code>KUBE-</code>/<code>CNI-</code>/<code>FLANNEL</code> iptables rules</strong> plus live <code>cni0</code> and <code>flannel.1</code> interfaces, which intercepted Docker's IPv4 loopback publishing.</dd>
+      <dt>Fix</dt>
+      <dd><code>k3s-killall.sh</code>, which k3s ships for exactly this, then a Docker restart so it reinstalls its own rules. <strong>Stopping a service does not undo what it did to the host.</strong></dd>
+    </dl>
+  </div>
+
+  <h3 style="margin-top:52px">The rest, briefly</h3>
+  <div class="col">
+    <ul class="tight">
+      <li><strong>Double JSON encoding.</strong> A producer used <code>JsonSerializer</code> while the relay already sends serialised JSON, so the broker received a JSON string containing JSON. The visible symptom was a missing dead-letter topic, two layers away from the cause.</li>
+      <li><strong><code>KafkaAdmin</code> silently ignores a <code>List&lt;NewTopic&gt;</code></strong> — it must be <code>KafkaAdmin.NewTopics</code>. Three dead-letter topics did not exist, and each poison message blocked for 60 s.</li>
+      <li><strong>A list in two Spring Cloud Config sources does not merge.</strong> Profile beats specificity, so a per-route override replaced the entire route table and every <code>/api/**</code> path 404'd.</li>
+      <li><strong>The edge stricter than the services it fronts — three separate times.</strong> Three paths were public in a service and missing from the gateway's allowlist. Three bugs from one duplication is where duplication stops being acceptable.</li>
+      <li><strong><code>auto.create.topics.enable=false</code> blocked Debezium.</strong> Connectors <code>RUNNING</code>, producing nothing.</li>
+      <li><strong>Elasticsearch stops counting at 10,000.</strong> The storefront showed "10,000 matches" against a 32,951-document index. Every query measured in Step 7 returned fewer than that; browsing with <em>no query at all</em> was the case too simple to have been measured.</li>
+      <li><strong>Three scripts asserted outcomes without checking their preconditions</strong> — buying two units of a product with one in stock, then reporting the saga's correct compensation as a failure.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 5 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">05</span><h2>The experiments, and what they measured</h2></div>
+  <div class="col">
+    <p>
+      Each of these is a script in <code>scripts/</code> or <code>eval/</code> that produces the number
+      when run. Absolute latencies are worse than a real deployment — everything shares one laptop —
+      so the <em>relative</em> figures are the ones worth reading.
+    </p>
+  </div>
+
+  <h3>Ingestion — does real data behave like the published dataset?</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Measure</th><th class="n">Result</th><th>Verification</th></tr></thead>
+      <tbody>
+        <tr><td>Rows across five databases</td><td class="n big">~481,000</td><td>in 24.9 s, idempotent on re-run</td></tr>
+        <tr><td>Orders</td><td class="n">99,441</td><td>matches Olist's published figure exactly</td></tr>
+        <tr><td>Order items</td><td class="n">112,650</td><td>0 orphans</td></tr>
+        <tr><td>Payments</td><td class="n">103,886</td><td>R$ 16,008,872.12 total</td></tr>
+        <tr><td>Synthetic comparison</td><td class="n">~490,000 / 30.3 s</td><td>same order of magnitude — load time is a property of Postgres, not content</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The saga — is the fast commit real, and does compensation work?</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Measure</th><th class="n">Result</th><th>What it demonstrates</th></tr></thead>
+      <tbody>
+        <tr><td>Order placement, to durable + announced</td><td class="n big">39 ms</td><td>was 60–77 ms when it called inventory synchronously</td></tr>
+        <tr><td><code>PENDING</code> → <code>CONFIRMED</code></td><td class="n">1.5 s</td><td>across five services and five Kafka hops</td></tr>
+        <tr><td>Compensation after a declined payment</td><td class="n">960 ms</td><td>stock released, <code>on_hand</code> never moved</td></tr>
+        <tr><td>Fault-injection tests</td><td class="n">8 passing</td><td>outbox atomicity under induced failure</td></tr>
+        <tr><td>Replayed charge</td><td class="n">1 payment row</td><td>consumer idempotency on a natural key</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Resilience and caching</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Experiment</th><th class="n">Before</th><th class="n">After</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Circuit breaker, dead dependency</td><td class="n">6.55 s</td><td class="n big">0.014 s</td><td>refusal once open; self-healed with no intervention</td></tr>
+        <tr><td>Database transactions under load</td><td class="n">578</td><td class="n big">7</td><td><span class="delta">98.8% removed</span> — the honest headline</td></tr>
+        <tr><td>p50 latency, warm cache</td><td class="n">11.6 ms</td><td class="n">7.8 ms</td><td>the cache removes <em>work</em>, not a bottleneck that existed</td></tr>
+        <tr><td>Warm hit rate</td><td class="n">—</td><td class="n">100%</td><td>500 hits / 0 misses, and now with all 500 responses verified 200</td></tr>
+        <tr><td>Rate limiting, 25 rapid logins</td><td class="n">—</td><td class="n">23 × 200, 2 × 429</td><td>Lua token bucket inside Redis</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>CDC and the warehouse</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Measure</th><th class="n">Result</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Change events captured</td><td class="n big">344,491</td><td>at 749/s</td></tr>
+        <tr><td>OLTP commit → warehouse visible</td><td class="n">495 ms median</td><td>dominated by the sink's poll interval</td></tr>
+        <tr><td>Facts built</td><td class="n">112,652</td><td>R$ 13,591,687.34, <strong>0 orphans</strong></td></tr>
+        <tr><td>Late-arriving dimensions</td><td class="n">7.91%</td><td>stub rows later reconciled</td></tr>
+        <tr><td>Read-only boundary</td><td class="n">MySQL 1142</td><td>agent's DELETE / UPDATE / CREATE all refused</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The agent — execution accuracy, and where the failures actually were</h3>
+  <div class="col">
+    <p>
+      33 questions across eight categories, each with hand-written gold SQL. Scoring is
+      <strong>execution accuracy</strong>: run both queries, compare result sets — column names and
+      order ignored, row order ignored unless the question is a ranking. Two questions were reworded
+      after the first run; the header of <code>questions.yaml</code> records that
+      <em>no question was changed because the model got it wrong</em>.
+    </p>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Run</th><th class="n">Correct</th><th class="n">Accuracy</th><th>What changed</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline</td><td class="n">26 / 33</td><td class="n">78.8%</td><td>—</td></tr>
+        <tr><td>After failure analysis</td><td class="n big">32 / 33</td><td class="n big">97.0%</td><td><strong>5 of 7 baseline failures were my metadata, not the model</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col">
+    <p>
+      The self-correction loop fired on 0 of 33 questions, so it was provoked deliberately with a
+      question the schema cannot answer. It hallucinated <code>SELECT AVG(age) FROM customers</code>,
+      validation rejected it, and the third attempt returned <code>NULL</code> rather than inventing a
+      number. Two correction cycles, observed rather than assumed.
+    </p>
+  </div>
+
+  <h3>Search</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Query</th><th>Intent</th><th class="n">Hits</th><th class="n">Score</th><th>Top category</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">health beauty</td><td>two words, underscore in the data</td><td class="n">2,444</td><td class="n">15.07</td><td class="mono">health_beauty</td></tr>
+        <tr><td class="mono">beaty</td><td>one missing letter</td><td class="n">2,444</td><td class="n">6.03</td><td class="mono">health_beauty</td></tr>
+        <tr><td class="mono">computr acessorie</td><td>two typos, two words</td><td class="n">2,867</td><td class="n">11.70</td><td class="mono">computers_accessories</td></tr>
+        <tr><td class="mono">beleza saude</td><td>the Portuguese source category</td><td class="n">2,444</td><td class="n">5.12</td><td class="mono">health_beauty</td></tr>
+        <tr><td class="mono">beleza saud</td><td>Portuguese <em>and</em> a typo</td><td class="n">2,444</td><td class="n">4.48</td><td class="mono">health_beauty</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col">
+    <p>
+      The result worth reading twice: <code>beaty</code> and <code>health beauty</code> return
+      <strong>the same 2,444 documents</strong>. The typo costs relevance score (15.07 → 6.03), not
+      recall — which is the intended shape, since scoring rather than filtering should decide what a
+      user sees first. Index freshness: <strong>median 942 ms</strong> from a catalogue <code>PUT</code>
+      to the change being visible to a <em>search</em> (not merely to a document fetch, which
+      Elasticsearch serves immediately and no user experiences).
+    </p>
+  </div>
+
+  <h3>One trace, the whole order path</h3>
+  <div class="evidence">
+    <div class="evidence-h">python scripts/show_trace.py — 20 spans · 4 services · 608 ms</div>
+<pre>service            span                                 start      dur
+api-gateway        http post                               0ms    54.6ms
+order-service      http post /api/orders                   4ms    49.1ms
+order-service      security filterchain before             5ms     1.7ms
+order-service      secured request                         6ms    46.3ms
+<u>order-service      security filterchain after             53ms     0.2ms</u>
+<b>order-service      outbox publish                         91ms     2.8ms   &lt;- the outbox gap</b>
+order-service      ecommerce.order.placed send             91ms     2.8ms
+inventory-service  ecommerce.order.placed receive          95ms    28.1ms
+inventory-service  ecommerce.inventory.reserved send      146ms     3.1ms
+payment-service    ecommerce.inventory.reserved receive   150ms    71.2ms
+<b>payment-service    outbox publish                         415ms    3.3ms</b>
+payment-service    ecommerce.payment.completed send       415ms    3.4ms
+order-service      ecommerce.payment.completed receive    419ms   14.5ms
+<i>order-service      ecommerce.order.confirmed send         606ms    2.8ms</i></pre>
+  </div>
+  <div class="col">
+    <p>
+      The two long gaps are not latency in any service — they are the relay's poll interval.
+      <strong>Roughly 250 ms of the 608 ms is waiting for a poll</strong>, which is the price paid for
+      the guarantee that no order can be committed without its event eventually being published. Before
+      the <code>traceparent</code> column existed, this same order produced four separate traces, the
+      widest covering one service.
+    </p>
+  </div>
+
+  <h3>Streaming, observed in a browser for the first time</h3>
+  <div class="col">
+    <p>
+      Until the storefront existed, the documentation said the server-sent-event path had never been
+      consumed by a browser — a Python client reads the same frames but cannot tell you <em>when</em>
+      they arrived. Eighteen progress events from one question, timestamped on arrival, spread across
+      17.3 seconds rather than delivered at the end. That is the evidence that the gateway is not
+      buffering, and it also showed for the first time that the agent's three recall branches run
+      <strong>concurrently</strong> — all three start within 141 ms of each other and finish 8 s apart.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 6 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">06</span><h2>Shipping it</h2></div>
+
+  <h3>Continuous integration</h3>
+  <div class="col">
+    <p>
+      Six jobs: Java build and Testcontainers tests, Python lint, storefront build, all nine container
+      images, Kubernetes manifest validation, and Compose plus warehouse-DDL sanity. It found four real
+      problems across three runs before going green — every one of them invisible on the machine that
+      wrote it.
+    </p>
+  </div>
+
+  <h3>Deployment</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Verified on the deployed system</th><th class="n">Result</th></tr></thead>
+      <tbody>
+        <tr><td>Containers running</td><td class="n">22</td></tr>
+        <tr><td>Memory used</td><td class="n">7.0 GiB / 15</td></tr>
+        <tr><td>Data loaded</td><td class="n">99,441 orders · R$ 16,008,872.12</td></tr>
+        <tr><td>Search index</td><td class="n">32,951 documents</td></tr>
+        <tr><td>Smoke test</td><td class="n big">18 / 18</td></tr>
+        <tr><td>Saga demo</td><td class="n">PASS</td></tr>
+        <tr><td>Browser purchase, public address</td><td class="n big">1,513 ms</td></tr>
+        <tr><td>Search round trip over the internet</td><td class="n">216 ms <span class="was">31 ms</span> local</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <h3>Why 4 vCPU turned out to be a floor, not a preference</h3>
+    <p>
+      The same host had been running a comparable Spring Cloud project under k3s on 2 vCPUs. It
+      reached <strong>0 of 20 pods ready after 17 minutes, with 65+ restarts and a load average of
+      21</strong> — and it was not memory: <code>MemoryPressure=False</code>, zero OOM kills. Nine JVMs
+      starting simultaneously do not merely start slowly; each is too slow to answer its own health
+      probe, the supervisor kills it, and the restart makes contention worse. The deploy script starts
+      infrastructure first and waits for health, which helps and is not a substitute for cores.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 7 ================= -->
+<section>
+  <div class="sec-head"><span class="sec-num">07</span><h2>What still does not work</h2></div>
+  <div class="col">
+    <p class="lead">
+      Kept deliberately, because a list of features is a claim and a list of failures is evidence that
+      the thing was actually run.
+    </p>
+    <ul class="tight">
+      <li><strong>Twelve units of stock are held against cancelled orders.</strong> Their release events were dead-lettered and nothing re-reads a dead-letter topic. The reservation sweeper is written and unwired.</li>
+      <li><strong>The agent smuggles refusals through the result channel.</strong> Asked for a measure the warehouse does not have, it returns <code>SELECT 'Error: ...'</code> — valid SQL whose single row is a sentence. A caller cannot distinguish that from an answer. The fix is in the agent's prompt, and the project's rule is to integrate rather than fork it.</li>
+      <li><strong>Only geography is reconciled.</strong> Any other fact column derived from a dimension attribute has the same late-arrival exposure.</li>
+      <li><strong>The Kubernetes manifests have never been applied to a cluster.</strong> 44 objects, schema-checked offline with <code>kubeconform -strict</code>, which says the schema is right and nothing about whether the platform would come up.</li>
+      <li><strong>The JWT signing key still lives in the config repository.</strong> Fine on a laptop; the first thing that must move on any real deployment.</li>
+      <li><strong>No end-to-end browser test in CI.</strong> The storefront build is checked; its behaviour is not.</li>
+    </ul>
+  </div>
+
+  <div class="callout">
+    <h3>What I would do differently</h3>
+    <p>
+      Write the smoke test before the third service, not after the fifth. Every bug in the
+      "edge stricter than the services" family was found by it in seconds, and each had been sitting
+      there since the moment the route was added.
+    </p>
+    <p>
+      And stop trusting any check that cannot fail on my own machine. Three of the last four bugs were
+      exactly that — a validation step that needed a cluster I happened to have, a test using a Redis I
+      happened to be running, a benchmark timing errors because it never read a status code.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Every figure on this page was produced by a script in the repository and is reproducible from a
+    clean checkout. Where a number was later found to be wrong — Step 6's cache figures — the original
+    is left visible above the correction rather than quietly replaced.
+  </p>
+</footer>
+
+</div>
