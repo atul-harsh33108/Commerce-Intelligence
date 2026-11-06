@@ -162,7 +162,8 @@ flowchart TB
   KAFKA --> PAY
   AGENT --> MYSQL
 
-  linkStyle 0,1 stroke:#be185d,stroke-width:2px;
+  linkStyle 0 stroke:#be185d,stroke-width:2px;
+  linkStyle 1 stroke:#be185d,stroke-width:2px;
   linkStyle 2 stroke:#0369a1,stroke-dasharray:4 3;
 ```
 
