@@ -289,23 +289,21 @@ flowchart TB
     EVAL["eval/run_eval.py<br/>execution-accuracy harness"]:::ui
   end
 
-  subgraph MCPLAYER["agent/mcp_server/server.py — stdio MCP server"]
-    TOOL1["query_database(question)"]:::mcp
-    TOOL2["list_tables()"]:::mcp
-    TOOL3["get_table_schema(table_name)"]:::mcp
+  subgraph MCPLAYER["agent/mcp_server/server.py · stdio MCP server"]
+    TOOL1["query_database"]:::mcp
+    TOOL2["list_tables"]:::mcp
+    TOOL3["get_table_schema"]:::mcp
   end
 
   GW["api-gateway :8080<br/>rewrites /api/analytics to /api<br/>strips Content-Length so SSE is not buffered<br/>response-timeout 120 s · JWT enforced at the edge"]:::gw
 
-  subgraph BACKEND["agent/backend — analytics-agent :8000 (FastAPI)"]
-    EP["POST /api/query (SSE)<br/>GET /api/tables · /api/schema/... · /health"]:::api
-    subgraph LANGGRAPH["LangGraph pipeline — app/agent/graph.py"]
-      N1["extract_keywords"]:::lg
-      N2["recall_column · recall_value · recall_metric"]:::lg
-      N3["merge_retrieved_info → filter_table · filter_metric"]:::lg
-      N4["generate_sql"]:::lg
-      N5["validate_sql → execute_sql · correct_sql max 3 · fail_sql"]:::lg
-    end
+  subgraph BACKEND["agent/backend · analytics-agent :8000 · FastAPI<br/>LangGraph pipeline, app/agent/graph.py"]
+    EP["POST /api/query · SSE<br/>GET /api/tables · /api/schema · /health"]:::api
+    N1["extract_keywords"]:::lg
+    N2["recall_column · recall_value · recall_metric"]:::lg
+    N3["merge_retrieved_info then filter_table · filter_metric"]:::lg
+    N4["generate_sql"]:::lg
+    N5["validate_sql then execute · correct up to 3 · fail"]:::lg
   end
 
   subgraph SUPPORT["Retrieval + state"]
