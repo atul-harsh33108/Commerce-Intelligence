@@ -1,0 +1,253 @@
+# Build, test, and check the things that are cheap to check.
+#
+# WHAT THIS DOES AND DOES NOT DO, because a CI file that claims more than it runs is worse than none:
+#
+#   it does      compile every Maven module, run the Java test suites against real containers
+#                (Testcontainers works on GitHub's runners - Docker is available), lint the Python,
+#                build the storefront, build all nine container images, schema-check the Kubernetes
+#                manifests, verify the Compose file parses, and apply the warehouse DDL to a real
+#                MySQL
+#   it does not  stand up the full platform, run the smoke test, run the saga demo, exercise the
+#                agent, push an image anywhere, or deploy. Those need nine JVMs, Kafka, five
+#                databases and an LLM API key, and a CI job that takes twenty minutes to tell you
+#                something a developer already knows is a job people learn to ignore. There is also
+#                no registry and no deployment target, so the pipeline honestly stops at "it builds".
+#
+# AND IT HAS NEVER RUN. There is no remote - the project's ground rule is local commits only - so
+# every job here is a careful guess about what would pass. That is recorded in docs/reflection.md
+# rather than left for someone to discover from a green badge that was never earned.
+#
+# The test gate lives HERE and not in the Dockerfile. Building an image with -DskipTests and testing
+# separately is the arrangement that lets a broken build fail in two minutes instead of after a
+# fifteen-minute image build - and it keeps the image reproducible from a known-good commit rather
+# than from whatever the test environment happened to be.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel an in-flight run when a newer commit lands on the same branch. Without this, pushing three
+# times in a minute queues three full builds and the first two are answering questions nobody has.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  java:
+    name: Java build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          # Caches ~/.m2 keyed on every pom.xml. Without it every run re-downloads ~400 MB of Spring.
+          cache: maven
+
+      - name: Compile
+        working-directory: ecommerce-platform
+        run: ./mvnw -B -ntp -DskipTests package
+
+      # Separate step from the compile, so the summary distinguishes "it does not build" from
+      # "it builds and the tests fail" - two different problems with two different owners.
+      - name: Test
+        working-directory: ecommerce-platform
+        # Testcontainers starts a real PostgreSQL per module. GitHub's ubuntu runners have Docker,
+        # so this is the same test that runs locally rather than an H2-flavoured approximation.
+        run: ./mvnw -B -ntp test
+
+      - name: Publish test report
+        # `always()` so a failing build still uploads the report that explains why. Without it, the
+        # one artifact you want is the one that is missing.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: 'ecommerce-platform/*/target/surefire-reports/**'
+          retention-days: 7
+
+  python:
+    name: Python checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: pip install ruff pyyaml
+
+      # Syntax and obvious errors only. A full type-check or a strict lint on scripts that are
+      # deliberately procedural would produce noise nobody acts on.
+      - name: Lint
+        run: ruff check scripts warehouse --select E9,F63,F7,F82
+
+      - name: Compile every script
+        run: python -m compileall -q scripts warehouse
+
+      # The metadata is prose about a schema and nothing connects the two - a renamed column leaves
+      # the agent retrieving something that no longer exists. This checks it parses; the full check
+      # against a live warehouse is scripts/validate_agent_metadata.py.
+      - name: Agent metadata parses
+        run: python -c "import yaml,sys; d=yaml.safe_load(open('agent/backend/conf/meta_config.yaml')); print(f\"{len(d['tables'])} tables, {len(d['metrics'])} metrics\")"
+
+  frontend:
+    name: Storefront build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci`, not `npm install`. ci installs exactly the lockfile and fails if package.json and
+      # the lock disagree; install would quietly resolve a newer version and build something the
+      # developer never ran. This project has already been bitten by a stale lockfile once - see
+      # docs/reflection.md on the agent's langchain-huggingface pin.
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      # A type error, a bad import or an unresolved module fails here. This does NOT test the
+      # storefront's behaviour - that needs the whole platform running, and the honest place for it
+      # is a Playwright job that does not exist yet (docs/reflection.md).
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  images:
+    name: Container images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Only after the tests pass. Building nine images from code that does not compile is twenty
+    # minutes spent to learn something the java job already knew.
+    needs: java
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      # The jar is built here, in the same job, from the same checkout as the image. That is what
+      # keeps the image reproducible from a git SHA despite the Dockerfile copying a prebuilt jar -
+      # see the comment at the top of ecommerce-platform/Dockerfile for why the build is not inside
+      # the image.
+      - name: Package
+        working-directory: ecommerce-platform
+        run: ./mvnw -B -q -DskipTests package
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build every service image
+        working-directory: ecommerce-platform
+        run: |
+          for module in config-server discovery-server api-gateway user-service \
+                        catalog-service inventory-service order-service payment-service \
+                        search-service; do
+            echo "::group::$module"
+            docker build --build-arg "MODULE=$module" -t "ecommerce/$module:${GITHUB_SHA::7}" .
+            echo "::endgroup::"
+          done
+
+      # NOT PUSHED ANYWHERE. There is no registry and no deployment target, so the pipeline stops at
+      # "the image builds". Adding a push step against a registry that does not exist would make this
+      # workflow claim a delivery path it has not got.
+      - name: Image sizes
+        run: docker images "ecommerce/*" --format "{{.Repository}}:{{.Tag}}  {{.Size}}"
+
+  manifests:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # kubeconform, NOT `kubectl apply --dry-run=client`.
+      #
+      # This step originally used the kubectl dry run, on the belief that `--dry-run=client` is an
+      # offline operation. IT IS NOT. The client still fetches the OpenAPI schema from the API server
+      # to validate against, so on a runner with no cluster every file fails with
+      #
+      #   failed to download openapi: Get "http://localhost:8080/openapi/v2": connection refused
+      #
+      # It passed on my laptop only because a kubeconfig there points at Docker Desktop's Kubernetes.
+      # That is the entire reason this workflow needed to actually run: a check that silently depends
+      # on the author's machine is not a check.
+      #
+      # kubeconform validates against bundled JSON schemas with no cluster at all, which is what the
+      # step always claimed to be doing. -strict rejects unknown fields, which the kubectl dry run
+      # would have accepted.
+      - name: Validate manifests offline (kubeconform)
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz"             | tar -xz kubeconform
+          ./kubeconform -strict -summary k8s/base/
+
+  compose:
+    name: Compose and SQL sanity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Catches a YAML error or an undefined variable before anyone tries to start the stack.
+      # GEMINI_API_KEY is required by the agent profile, so a dummy value is supplied - the point is
+      # to validate the file, not to run it.
+      - name: docker compose config
+        env:
+          GEMINI_API_KEY: dummy-for-validation
+        run: docker compose config --quiet
+
+      # The warehouse DDL is loaded by MySQL's entrypoint, where a syntax error appears as a
+      # container that exits during startup with the message buried in `docker compose logs`.
+      # Running it against a real MySQL here turns that into a build failure with a line number.
+      - name: Warehouse DDL applies to a real MySQL
+        run: |
+          docker run -d --name ddl-check \
+            -e MYSQL_ROOT_PASSWORD=warehouse \
+            -e MYSQL_DATABASE=dw \
+            -e MYSQL_USER=warehouse -e MYSQL_PASSWORD=warehouse \
+            -v "$PWD/warehouse/ddl:/docker-entrypoint-initdb.d:ro" \
+            mysql:8.0
+          for i in $(seq 1 60); do
+            if docker exec ddl-check mysqladmin ping -h127.0.0.1 -uroot -pwarehouse --silent 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          # An init script that fails does NOT stop the container on a re-run, so the log is the
+          # only place the failure shows up. Grepping it is the check.
+          if docker logs ddl-check 2>&1 | grep -q "ERROR"; then
+            echo "::error::warehouse DDL failed to apply"
+            docker logs ddl-check 2>&1 | grep -B2 -A2 ERROR
+            exit 1
+          fi
+          docker exec ddl-check mysql -uroot -pwarehouse -e \
+            "SELECT COUNT(*) AS dim_date_rows FROM dw.dim_date; SHOW TABLES FROM dw;"
+          docker rm -f ddl-check
