@@ -297,8 +297,9 @@ flowchart TB
 
   GW["api-gateway :8080<br/>rewrites /api/analytics to /api<br/>strips Content-Length so SSE is not buffered<br/>response-timeout 120 s · JWT enforced at the edge"]:::gw
 
-  subgraph BACKEND["agent/backend · analytics-agent :8000 · FastAPI<br/>LangGraph pipeline, app/agent/graph.py"]
+  subgraph BACKEND["agent/backend · analytics-agent :8000 · FastAPI + LangGraph"]
     EP["POST /api/query · SSE<br/>GET /api/tables · /api/schema · /health"]:::api
+    N0["app/agent/graph.py · StateGraph"]:::lg
     N1["extract_keywords"]:::lg
     N2["recall_column · recall_value · recall_metric"]:::lg
     N3["merge_retrieved_info then filter_table · filter_metric"]:::lg
@@ -328,7 +329,8 @@ flowchart TB
   TOOL2 -->|"GET /api/tables"| EP
   TOOL3 -->|"GET /api/schema"| EP
   GW -->|"JWT + RewritePath"| EP
-  EP --> N1
+  EP --> N0
+  N0 --> N1
   N1 --> N2
   N2 --> N3
   N3 --> N4
@@ -344,10 +346,8 @@ flowchart TB
   N5 --> GEM
   EP --> LOGS
 
-  linkStyle 5 stroke:#b45309;
-  linkStyle 6 stroke:#b45309;
-  linkStyle 7 stroke:#b45309;
-  linkStyle 8 stroke:#6d28d9;
+  linkStyle 5,6,7 stroke:#b45309
+  linkStyle 8 stroke:#6d28d9
 ```
 
 **The seam worth explaining.** The agent is reachable on exactly one path (`/api/analytics/**`) with
