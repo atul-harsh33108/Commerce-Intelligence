@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+logs/
+tests/accuracy_report.json
+conf/app_config.yaml

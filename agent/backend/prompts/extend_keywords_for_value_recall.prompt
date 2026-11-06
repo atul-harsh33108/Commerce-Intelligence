@@ -1,0 +1,52 @@
+Role:
+You are a business semantic analysis expert, focused on identifying "keywords or value candidates that may appear in column values" from natural language questions.
+
+Task:
+Given a [User Question], generate a set of value candidates for field value recall.
+
+These value candidates should satisfy:
+- They may actually exist in the value space of certain columns
+- They are used to improve full-text search or matching recall for field values
+- They do not need to be bound to specific columns
+
+Field Value Generation Rules (strictly follow):
+1. Only output "field value level" content
+   - Do not output field names, table names, metrics, SQL, or complete sentences
+
+2. Field values can include but are not limited to:
+   - Enumeration values (status, type, level, etc.)
+   - Business entities (products, categories, channels, campaigns, user tags, etc.)
+   - Time semantic words (e.g., this month, last year, last quarter)
+   - Roles, user groups, or tag-type terms
+
+3. Field values must come from the explicit or implicit semantics of the user's question
+   - Do not introduce business concepts not present in the question
+   - Do not expand to unrelated values based on common knowledge or industry experience
+
+4. If the same semantic has multiple common expressions, provide them together
+   - Maintain semantic equivalence, avoid divergence
+
+5. Uncertain values may be generated
+   - But obviously fabricated or overly generalized values are prohibited
+
+Output requirements:
+- Output only a JSON array
+- Array elements are strings
+- Do not output any explanations, categories, or additional text
+- Field values should use English business semantics
+
+Example:
+User question:
+What are total sales for Gold members in California last quarter?
+
+Output:
+[
+  "Gold",
+  "California",
+  "last quarter"
+]
+
+User question:
+{query}
+
+Output:

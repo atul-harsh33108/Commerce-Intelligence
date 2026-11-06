@@ -1,0 +1,57 @@
+logging:
+  file:
+    enable: true
+    level: INFO
+    path: logs
+    rotation: "10 MB"
+    retention: "7 days"
+  console:
+    enable: true
+    level: INFO
+
+db_meta:
+  host: localhost
+  port: 3307
+  user: atguigu
+  password: Atguigu.123
+  database: meta
+
+db_dw:
+  host: localhost
+  port: 3307
+  user: atguigu
+  password: Atguigu.123
+  database: dw
+
+qdrant:
+  host: localhost
+  port: 6335
+  embedding_size: 1024
+
+embedding:
+  host: localhost
+  port: 8082
+  model: BAAI/bge-large-en-v1.5
+
+es:
+  host: localhost
+  port: 9201
+  index_name: data_agent
+
+redis:
+  host: localhost
+  port: 6380
+  db: 0
+
+db_logs:
+  host: localhost
+  port: 5433
+  user: dataquery
+  password: dataquery123
+  database: query_logs
+
+llm:
+  model_name: gemini-2.5-flash
+  api_key: YOUR_GEMINI_API_KEY_HERE
+  provider: google_genai
+  base_url: ""

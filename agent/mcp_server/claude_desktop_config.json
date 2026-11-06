@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "dataquery-agent": {
+      "command": "python",
+      "args": [
+        "D:\\project\\dataquery-agent\\mcp_server\\server.py",
+        "--backend-url",
+        "http://localhost:8000"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\project\\dataquery-agent\\mcp_server"
+      }
+    }
+  }
+}

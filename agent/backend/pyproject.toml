@@ -1,0 +1,43 @@
+[project]
+name = "data-agent"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncmy>=0.2.11",
+    "asyncpg>=0.30.0",
+    "cryptography>=46.0.4",
+    "elasticsearch[async]>=8,<9",
+    "fastapi[standard]>=0.128.0",
+    "huggingface-hub>=0.36.0",
+    "redis>=5.0.0",
+    "spacy>=3.7.0",
+    "langchain>=1.2.7",
+    "langchain-deepseek>=1.0.1",
+    "langchain-google-genai>=2.1.0",
+    # PINNED, not a range, and this is the one dependency change made to the copied agent.
+    #
+    # `HuggingFaceEndpointEmbeddings(model="http://embedding:80")` is how this service talks to its
+    # local Text Embeddings Inference container. A later langchain-huggingface rejects that:
+    #
+    #     ValidationError: `model` must be a HuggingFace repo ID, not a URL
+    #
+    # so a fresh `pip install` of the range produced an agent that failed at startup, in code that
+    # was correct when it was written. The uv.lock next to this file pins 1.2.0 and would have
+    # prevented it - except that the lock is STALE (it still lists jieba and has no spacy), so it
+    # cannot be installed from with `uv sync --frozen`.
+    #
+    # Pinning the single package that drifted is the smallest honest fix. The alternative - editing
+    # embedding_client_manager.py to the new API - would work and would turn "integrate" into "fork".
+    # Regenerating the lock is the right long-term answer and belongs to whoever owns that repo.
+    "langchain-huggingface==1.2.0",
+    "langgraph>=1.0.7",
+    "loguru>=0.7.3",
+    "omegaconf>=2.3.0",
+    "pyyaml>=6.0.3",
+    "qdrant-client>=1.16.2",
+    "sqlalchemy>=2.0.46",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

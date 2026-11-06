@@ -1,0 +1,2582 @@
+{
+  "date": "2026-03-17T15:17:40.823656",
+  "total": 45,
+  "passed": 43,
+  "execution_accuracy": 95.55555555555556,
+  "category_breakdown": {
+    "Simple Aggregation": {
+      "passed": 5,
+      "total": 5
+    },
+    "Single Dimension Filtering": {
+      "passed": 5,
+      "total": 5
+    },
+    "Multi-Dimension Analysis": {
+      "passed": 5,
+      "total": 5
+    },
+    "Ranking / Top-N": {
+      "passed": 5,
+      "total": 5
+    },
+    "Computed Metrics": {
+      "passed": 5,
+      "total": 5
+    },
+    "Time-Based": {
+      "passed": 4,
+      "total": 5
+    },
+    "Complex Multi-Table Joins": {
+      "passed": 5,
+      "total": 5
+    },
+    "Ambiguous / Colloquial": {
+      "passed": 4,
+      "total": 5
+    },
+    "Edge Cases & Stress Tests": {
+      "passed": 5,
+      "total": 5
+    }
+  },
+  "results": [
+    {
+      "query": "What are the total sales by region?",
+      "success": true,
+      "data": [
+        {
+          "region_name": "West",
+          "total sales": 70202.0
+        },
+        {
+          "region_name": "Southeast",
+          "total sales": 60210.0
+        },
+        {
+          "region_name": "Northeast",
+          "total sales": 47163.0
+        },
+        {
+          "region_name": "Midwest",
+          "total sales": 41099.5
+        },
+        {
+          "region_name": "South",
+          "total sales": 31528.0
+        },
+        {
+          "region_name": "Northwest",
+          "total sales": 28957.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What is the total GMV?",
+      "success": true,
+      "data": [
+        {
+          "SUM(fact_order.order_amount)": 279159.5
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "How many orders are there in total?",
+      "success": true,
+      "data": [
+        {
+          "COUNT(order_id)": 115
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What is the total order quantity across all orders?",
+      "success": true,
+      "data": [
+        {
+          "SUM(order_quantity)": "622"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Show me the overall revenue",
+      "success": true,
+      "data": [
+        {
+          "SUM(fact_order.order_amount)": 279159.5
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What are the sales in California?",
+      "success": true,
+      "data": [
+        {
+          "SUM(T1.order_amount)": 70202.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Show me orders from Gold members",
+      "success": true,
+      "data": [
+        {
+          "order_id": "ORD20250101001",
+          "customer_id": "C001"
+        },
+        {
+          "order_id": "ORD20250102001",
+          "customer_id": "C003"
+        },
+        {
+          "order_id": "ORD20250102002",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250109001",
+          "customer_id": "C011"
+        },
+        {
+          "order_id": "ORD20250110002",
+          "customer_id": "C003"
+        },
+        {
+          "order_id": "ORD20250115001",
+          "customer_id": "C014"
+        },
+        {
+          "order_id": "ORD20250116001",
+          "customer_id": "C001"
+        },
+        {
+          "order_id": "ORD20250118001",
+          "customer_id": "C003"
+        },
+        {
+          "order_id": "ORD20250119001",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250120002",
+          "customer_id": "C014"
+        },
+        {
+          "order_id": "ORD20250125002",
+          "customer_id": "C018"
+        },
+        {
+          "order_id": "ORD20250127001",
+          "customer_id": "C011"
+        },
+        {
+          "order_id": "ORD20250202001",
+          "customer_id": "C014"
+        },
+        {
+          "order_id": "ORD20250203001",
+          "customer_id": "C001"
+        },
+        {
+          "order_id": "ORD20250205001",
+          "customer_id": "C003"
+        },
+        {
+          "order_id": "ORD20250205002",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250206001",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250214001",
+          "customer_id": "C011"
+        },
+        {
+          "order_id": "ORD20250220001",
+          "customer_id": "C014"
+        },
+        {
+          "order_id": "ORD20250221001",
+          "customer_id": "C001"
+        },
+        {
+          "order_id": "ORD20250223001",
+          "customer_id": "C003"
+        },
+        {
+          "order_id": "ORD20250224001",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250304001",
+          "customer_id": "C011"
+        },
+        {
+          "order_id": "ORD20250310001",
+          "customer_id": "C014"
+        },
+        {
+          "order_id": "ORD20250311001",
+          "customer_id": "C001"
+        },
+        {
+          "order_id": "ORD20250313001",
+          "customer_id": "C003"
+        },
+        {
+          "order_id": "ORD20250314001",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250320002",
+          "customer_id": "C018"
+        },
+        {
+          "order_id": "ORD20250322001",
+          "customer_id": "C011"
+        },
+        {
+          "order_id": "ORD20250322002",
+          "customer_id": "C011"
+        },
+        {
+          "order_id": "ORD20250328001",
+          "customer_id": "C014"
+        },
+        {
+          "order_id": "ORD20250329001",
+          "customer_id": "C001"
+        },
+        {
+          "order_id": "ORD20250330002",
+          "customer_id": "C008"
+        },
+        {
+          "order_id": "ORD20250331001",
+          "customer_id": "C003"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Total sales for Electronics category",
+      "success": true,
+      "data": [
+        {
+          "SUM(T1.order_amount)": 194771.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "How much revenue did female customers generate?",
+      "success": true,
+      "data": [
+        {
+          "SUM(T1.order_amount)": 143789.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What are the sales in the West region?",
+      "success": true,
+      "data": [
+        {
+          "SUM(T1.order_amount)": 70202.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What are the total sales by product category and region?",
+      "success": true,
+      "data": [
+        {
+          "category": "Apparel",
+          "region_name": "Midwest",
+          "total_sales": 997.0
+        },
+        {
+          "category": "Apparel",
+          "region_name": "Northeast",
+          "total_sales": 1996.0
+        },
+        {
+          "category": "Apparel",
+          "region_name": "Northwest",
+          "total_sales": 1497.0
+        },
+        {
+          "category": "Apparel",
+          "region_name": "South",
+          "total_sales": 199.0
+        },
+        {
+          "category": "Apparel",
+          "region_name": "Southeast",
+          "total_sales": 798.0
+        },
+        {
+          "category": "Apparel",
+          "region_name": "West",
+          "total_sales": 1196.0
+        },
+        {
+          "category": "Electronics",
+          "region_name": "Midwest",
+          "total_sales": 26896.0
+        },
+        {
+          "category": "Electronics",
+          "region_name": "Northeast",
+          "total_sales": 32996.0
+        },
+        {
+          "category": "Electronics",
+          "region_name": "Northwest",
+          "total_sales": 16498.0
+        },
+        {
+          "category": "Electronics",
+          "region_name": "South",
+          "total_sales": 20796.0
+        },
+        {
+          "category": "Electronics",
+          "region_name": "Southeast",
+          "total_sales": 45692.0
+        },
+        {
+          "category": "Electronics",
+          "region_name": "West",
+          "total_sales": 51893.0
+        },
+        {
+          "category": "Food & Beverage",
+          "region_name": "Midwest",
+          "total_sales": 345.0
+        },
+        {
+          "category": "Food & Beverage",
+          "region_name": "Northeast",
+          "total_sales": 775.0
+        },
+        {
+          "category": "Food & Beverage",
+          "region_name": "Northwest",
+          "total_sales": 365.0
+        },
+        {
+          "category": "Food & Beverage",
+          "region_name": "South",
+          "total_sales": 455.0
+        },
+        {
+          "category": "Food & Beverage",
+          "region_name": "Southeast",
+          "total_sales": 100.0
+        },
+        {
+          "category": "Food & Beverage",
+          "region_name": "West",
+          "total_sales": 450.0
+        },
+        {
+          "category": "Footwear",
+          "region_name": "Midwest",
+          "total_sales": 3097.0
+        },
+        {
+          "category": "Footwear",
+          "region_name": "Northeast",
+          "total_sales": 899.0
+        },
+        {
+          "category": "Footwear",
+          "region_name": "Northwest",
+          "total_sales": 899.0
+        },
+        {
+          "category": "Footwear",
+          "region_name": "South",
+          "total_sales": 1299.0
+        },
+        {
+          "category": "Footwear",
+          "region_name": "Southeast",
+          "total_sales": 3497.0
+        },
+        {
+          "category": "Footwear",
+          "region_name": "West",
+          "total_sales": 3497.0
+        },
+        {
+          "category": "Home Appliances",
+          "region_name": "Midwest",
+          "total_sales": 9598.0
+        },
+        {
+          "category": "Home Appliances",
+          "region_name": "Northeast",
+          "total_sales": 10497.0
+        },
+        {
+          "category": "Home Appliances",
+          "region_name": "Northwest",
+          "total_sales": 9598.0
+        },
+        {
+          "category": "Home Appliances",
+          "region_name": "South",
+          "total_sales": 8699.0
+        },
+        {
+          "category": "Home Appliances",
+          "region_name": "Southeast",
+          "total_sales": 9598.0
+        },
+        {
+          "category": "Home Appliances",
+          "region_name": "West",
+          "total_sales": 12798.0
+        },
+        {
+          "category": "Snacks",
+          "region_name": "Midwest",
+          "total_sales": 166.5
+        },
+        {
+          "category": "Snacks",
+          "region_name": "Northwest",
+          "total_sales": 100.0
+        },
+        {
+          "category": "Snacks",
+          "region_name": "South",
+          "total_sales": 80.0
+        },
+        {
+          "category": "Snacks",
+          "region_name": "Southeast",
+          "total_sales": 525.0
+        },
+        {
+          "category": "Snacks",
+          "region_name": "West",
+          "total_sales": 368.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Show monthly sales trend",
+      "success": true,
+      "data": [
+        {
+          "month": 1,
+          "GMV": 109030.5
+        },
+        {
+          "month": 2,
+          "GMV": 80009.0
+        },
+        {
+          "month": 3,
+          "GMV": 90120.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Sales by customer gender",
+      "success": true,
+      "data": [
+        {
+          "gender": "Male",
+          "total_sales": 135370.5
+        },
+        {
+          "gender": "Female",
+          "total_sales": 143789.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Columns",
+        "Recall Metrics",
+        "Recall Values",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Break down order quantity by brand and membership level",
+      "success": true,
+      "data": [
+        {
+          "brand": "Adidas",
+          "member_level": "Bronze",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Adidas",
+          "member_level": "Gold",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Adidas",
+          "member_level": "Platinum",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Adidas",
+          "member_level": "Silver",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Amazon",
+          "member_level": "Bronze",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Amazon",
+          "member_level": "Gold",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Amazon",
+          "member_level": "Platinum",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Amazon",
+          "member_level": "Silver",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Apple",
+          "member_level": "Bronze",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Apple",
+          "member_level": "Gold",
+          "total_order_quantity": "4"
+        },
+        {
+          "brand": "Apple",
+          "member_level": "Platinum",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Apple",
+          "member_level": "Silver",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Dyson",
+          "member_level": "Bronze",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Dyson",
+          "member_level": "Platinum",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Dyson",
+          "member_level": "Silver",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Horizon",
+          "member_level": "Bronze",
+          "total_order_quantity": "84"
+        },
+        {
+          "brand": "Horizon",
+          "member_level": "Gold",
+          "total_order_quantity": "26"
+        },
+        {
+          "brand": "Horizon",
+          "member_level": "Platinum",
+          "total_order_quantity": "8"
+        },
+        {
+          "brand": "Horizon",
+          "member_level": "Silver",
+          "total_order_quantity": "65"
+        },
+        {
+          "brand": "Huawei",
+          "member_level": "Bronze",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Huawei",
+          "member_level": "Gold",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Huawei",
+          "member_level": "Platinum",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Huawei",
+          "member_level": "Silver",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Instant Pot",
+          "member_level": "Gold",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Instant Pot",
+          "member_level": "Platinum",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Instant Pot",
+          "member_level": "Silver",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Lay's",
+          "member_level": "Bronze",
+          "total_order_quantity": "43"
+        },
+        {
+          "brand": "Lay's",
+          "member_level": "Gold",
+          "total_order_quantity": "33"
+        },
+        {
+          "brand": "Lay's",
+          "member_level": "Platinum",
+          "total_order_quantity": "7"
+        },
+        {
+          "brand": "Lay's",
+          "member_level": "Silver",
+          "total_order_quantity": "48"
+        },
+        {
+          "brand": "Levi's",
+          "member_level": "Gold",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Levi's",
+          "member_level": "Platinum",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Levi's",
+          "member_level": "Silver",
+          "total_order_quantity": "4"
+        },
+        {
+          "brand": "Midea",
+          "member_level": "Bronze",
+          "total_order_quantity": "4"
+        },
+        {
+          "brand": "Midea",
+          "member_level": "Platinum",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Midea",
+          "member_level": "Silver",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Nestle",
+          "member_level": "Bronze",
+          "total_order_quantity": "18"
+        },
+        {
+          "brand": "Nestle",
+          "member_level": "Gold",
+          "total_order_quantity": "10"
+        },
+        {
+          "brand": "Nestle",
+          "member_level": "Platinum",
+          "total_order_quantity": "13"
+        },
+        {
+          "brand": "Nestle",
+          "member_level": "Silver",
+          "total_order_quantity": "22"
+        },
+        {
+          "brand": "Nike",
+          "member_level": "Gold",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Nike",
+          "member_level": "Platinum",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Nike",
+          "member_level": "Silver",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Oreo",
+          "member_level": "Bronze",
+          "total_order_quantity": "10"
+        },
+        {
+          "brand": "Oreo",
+          "member_level": "Gold",
+          "total_order_quantity": "45"
+        },
+        {
+          "brand": "Oreo",
+          "member_level": "Platinum",
+          "total_order_quantity": "84"
+        },
+        {
+          "brand": "Oreo",
+          "member_level": "Silver",
+          "total_order_quantity": "28"
+        },
+        {
+          "brand": "Samsung",
+          "member_level": "Gold",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Samsung",
+          "member_level": "Platinum",
+          "total_order_quantity": "1"
+        },
+        {
+          "brand": "Samsung",
+          "member_level": "Silver",
+          "total_order_quantity": "2"
+        },
+        {
+          "brand": "Uniqlo",
+          "member_level": "Bronze",
+          "total_order_quantity": "6"
+        },
+        {
+          "brand": "Uniqlo",
+          "member_level": "Platinum",
+          "total_order_quantity": "3"
+        },
+        {
+          "brand": "Uniqlo",
+          "member_level": "Silver",
+          "total_order_quantity": "1"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Columns",
+        "Recall Values",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Correct SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Revenue by quarter and region",
+      "success": true,
+      "data": [
+        {
+          "quarter": "Q1",
+          "region_name": "Midwest",
+          "total_revenue": 41099.5
+        },
+        {
+          "quarter": "Q1",
+          "region_name": "Northeast",
+          "total_revenue": 47163.0
+        },
+        {
+          "quarter": "Q1",
+          "region_name": "Northwest",
+          "total_revenue": 28957.0
+        },
+        {
+          "quarter": "Q1",
+          "region_name": "South",
+          "total_revenue": 31528.0
+        },
+        {
+          "quarter": "Q1",
+          "region_name": "Southeast",
+          "total_revenue": 60210.0
+        },
+        {
+          "quarter": "Q1",
+          "region_name": "West",
+          "total_revenue": 70202.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Top 5 customers by order amount",
+      "success": true,
+      "data": [
+        {
+          "customer_name": "James Wilson",
+          "total_order_amount": 20764.5
+        },
+        {
+          "customer_name": "Daniel Martinez",
+          "total_order_amount": 19694.0
+        },
+        {
+          "customer_name": "Nicole Clark",
+          "total_order_amount": 19644.0
+        },
+        {
+          "customer_name": "Stephanie White",
+          "total_order_amount": 19500.0
+        },
+        {
+          "customer_name": "Chris Jackson",
+          "total_order_amount": 18982.5
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Which brand has the highest sales?",
+      "success": true,
+      "data": [
+        {
+          "brand": "Apple"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Which state has the most orders?",
+      "success": true,
+      "data": [
+        {
+          "province": "California"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Bottom 3 regions by total revenue",
+      "success": true,
+      "data": [
+        {
+          "region_name": "Northwest",
+          "total_revenue": 28957.0
+        },
+        {
+          "region_name": "South",
+          "total_revenue": 31528.0
+        },
+        {
+          "region_name": "Midwest",
+          "total_revenue": 41099.5
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Values",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Rank product categories by average order amount",
+      "success": true,
+      "data": [
+        {
+          "category": "Electronics",
+          "average_order_amount": 6716.241379310345
+        },
+        {
+          "category": "Home Appliances",
+          "average_order_amount": 3199.3684210526317
+        },
+        {
+          "category": "Footwear",
+          "average_order_amount": 1099.0
+        },
+        {
+          "category": "Apparel",
+          "average_order_amount": 556.9166666666666
+        },
+        {
+          "category": "Food & Beverage",
+          "average_order_amount": 113.18181818181819
+        },
+        {
+          "category": "Snacks",
+          "average_order_amount": 59.023809523809526
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What is the average order value?",
+      "success": true,
+      "data": [
+        {
+          "SUM(order_amount) / COUNT(DISTINCT order_id)": 2427.473913043478
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Average order quantity by region",
+      "success": true,
+      "data": [
+        {
+          "region_name": "West",
+          "average_order_quantity": "5.0769"
+        },
+        {
+          "region_name": "Southeast",
+          "average_order_quantity": "6.2000"
+        },
+        {
+          "region_name": "Northeast",
+          "average_order_quantity": "4.2105"
+        },
+        {
+          "region_name": "Midwest",
+          "average_order_quantity": "4.3158"
+        },
+        {
+          "region_name": "South",
+          "average_order_quantity": "6.4286"
+        },
+        {
+          "region_name": "Northwest",
+          "average_order_quantity": "6.9167"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What is the maximum single order amount?",
+      "success": true,
+      "data": [
+        {
+          "MAX(order_amount)": 9499.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What is the average revenue per customer?",
+      "success": true,
+      "data": [
+        {
+          "AVG(total_revenue_per_customer)": 13957.975
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Columns",
+        "Recall Values",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Show the min and max order amount by category",
+      "success": true,
+      "data": [
+        {
+          "category": "Electronics",
+          "min_order_amount": 1399.0,
+          "max_order_amount": 9499.0
+        },
+        {
+          "category": "Food & Beverage",
+          "min_order_amount": 40.0,
+          "max_order_amount": 250.0
+        },
+        {
+          "category": "Footwear",
+          "min_order_amount": 899.0,
+          "max_order_amount": 1299.0
+        },
+        {
+          "category": "Snacks",
+          "min_order_amount": 30.0,
+          "max_order_amount": 105.0
+        },
+        {
+          "category": "Apparel",
+          "min_order_amount": 199.0,
+          "max_order_amount": 1198.0
+        },
+        {
+          "category": "Home Appliances",
+          "min_order_amount": 899.0,
+          "max_order_amount": 5499.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What are the sales for Q1 2025?",
+      "success": true,
+      "data": [
+        {
+          "SUM(T1.order_amount)": 279159.5
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Which month had the highest revenue?",
+      "success": true,
+      "data": [
+        {
+          "month": 1
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Values",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": false,
+      "ex_reason": "Expected value 109030.5 not found in results"
+    },
+    {
+      "query": "Show the daily order count trend",
+      "success": true,
+      "data": [
+        {
+          "date_id": 20250101,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250102,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250103,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250104,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250105,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250106,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250107,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250108,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250109,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250110,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250111,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250112,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250113,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250114,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250115,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250116,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250117,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250118,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250119,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250120,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250121,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250122,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250123,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250124,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250125,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250126,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250127,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250128,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250129,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250130,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250131,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250201,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250202,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250203,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250204,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250205,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250206,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250207,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250208,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250209,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250210,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250211,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250212,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250213,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250214,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250215,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250216,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250217,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250218,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250219,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250220,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250221,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250222,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250223,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250224,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250225,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250226,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250227,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250228,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250301,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250302,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250303,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250304,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250305,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250306,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250307,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250308,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250309,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250310,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250311,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250312,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250313,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250314,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250315,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250316,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250317,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250318,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250319,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250320,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250321,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250322,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250323,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250324,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250325,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250326,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250327,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250328,
+          "daily_order_count": 1
+        },
+        {
+          "date_id": 20250329,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250330,
+          "daily_order_count": 2
+        },
+        {
+          "date_id": 20250331,
+          "daily_order_count": 1
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Values",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Total sales by month",
+      "success": true,
+      "data": [
+        {
+          "month": 1,
+          "total_sales": 109030.5
+        },
+        {
+          "month": 2,
+          "total_sales": 80009.0
+        },
+        {
+          "month": 3,
+          "total_sales": 90120.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Columns",
+        "Recall Values",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Compare sales across months",
+      "success": true,
+      "data": [
+        {
+          "month": 1,
+          "Total_Sales": 109030.5
+        },
+        {
+          "month": 2,
+          "Total_Sales": 80009.0
+        },
+        {
+          "month": 3,
+          "Total_Sales": 90120.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Columns",
+        "Recall Values",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Sales by brand in the West region",
+      "success": true,
+      "data": [
+        {
+          "brand": "Apple",
+          "total_sales": 26997.0
+        },
+        {
+          "brand": "Lay's",
+          "total_sales": 200.0
+        },
+        {
+          "brand": "Midea",
+          "total_sales": 6400.0
+        },
+        {
+          "brand": "Huawei",
+          "total_sales": 13998.0
+        },
+        {
+          "brand": "Oreo",
+          "total_sales": 168.0
+        },
+        {
+          "brand": "Dyson",
+          "total_sales": 5499.0
+        },
+        {
+          "brand": "Nike",
+          "total_sales": 899.0
+        },
+        {
+          "brand": "Amazon",
+          "total_sales": 1399.0
+        },
+        {
+          "brand": "Adidas",
+          "total_sales": 2598.0
+        },
+        {
+          "brand": "Nestle",
+          "total_sales": 400.0
+        },
+        {
+          "brand": "Samsung",
+          "total_sales": 9499.0
+        },
+        {
+          "brand": "Horizon",
+          "total_sales": 50.0
+        },
+        {
+          "brand": "Levi's",
+          "total_sales": 599.0
+        },
+        {
+          "brand": "Uniqlo",
+          "total_sales": 597.0
+        },
+        {
+          "brand": "Instant Pot",
+          "total_sales": 899.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Top 3 product categories by sales in Northeast",
+      "success": true,
+      "data": [
+        {
+          "category": "Electronics",
+          "total_sales": 32996.0
+        },
+        {
+          "category": "Home Appliances",
+          "total_sales": 10497.0
+        },
+        {
+          "category": "Apparel",
+          "total_sales": 1996.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Gold member spending by product category in California",
+      "success": true,
+      "data": [
+        {
+          "category": "Electronics",
+          "total_spending": 35895.0
+        },
+        {
+          "category": "Footwear",
+          "total_spending": 2198.0
+        },
+        {
+          "category": "Home Appliances",
+          "total_spending": 899.0
+        },
+        {
+          "category": "Apparel",
+          "total_spending": 599.0
+        },
+        {
+          "category": "Snacks",
+          "total_spending": 156.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Average order value by gender and region",
+      "success": true,
+      "data": [
+        {
+          "gender": "Male",
+          "region_name": "West",
+          "AOV": 2975.6
+        },
+        {
+          "gender": "Female",
+          "region_name": "Southeast",
+          "AOV": 2804.5384615384614
+        },
+        {
+          "gender": "Female",
+          "region_name": "Northeast",
+          "AOV": 2113.0
+        },
+        {
+          "gender": "Male",
+          "region_name": "Midwest",
+          "AOV": 1823.2142857142858
+        },
+        {
+          "gender": "Male",
+          "region_name": "South",
+          "AOV": 2456.375
+        },
+        {
+          "gender": "Female",
+          "region_name": "West",
+          "AOV": 1781.6666666666667
+        },
+        {
+          "gender": "Female",
+          "region_name": "Northwest",
+          "AOV": 2413.0833333333335
+        },
+        {
+          "gender": "Male",
+          "region_name": "Northeast",
+          "AOV": 3282.3333333333335
+        },
+        {
+          "gender": "Female",
+          "region_name": "South",
+          "AOV": 1979.5
+        },
+        {
+          "gender": "Female",
+          "region_name": "Midwest",
+          "AOV": 2361.4166666666665
+        },
+        {
+          "gender": "Male",
+          "region_name": "Southeast",
+          "AOV": 1979.25
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Values",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Monthly revenue trend for Electronics in the South",
+      "success": true,
+      "data": [
+        {
+          "month": 1,
+          "monthly_revenue": 8999.0
+        },
+        {
+          "month": 2,
+          "monthly_revenue": 8999.0
+        },
+        {
+          "month": 3,
+          "monthly_revenue": 2798.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Metrics",
+        "Recall Columns",
+        "Recall Values",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "How's business doing?",
+      "success": true,
+      "data": [
+        {
+          "total_revenue": 279159.5,
+          "total_orders": 115,
+          "average_order_value": 2427.473913043478
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Who are our best buyers?",
+      "success": true,
+      "data": [
+        {
+          "customer_name": "James Wilson",
+          "total_gmv": 20764.5
+        },
+        {
+          "customer_name": "Daniel Martinez",
+          "total_gmv": 19694.0
+        },
+        {
+          "customer_name": "Nicole Clark",
+          "total_gmv": 19644.0
+        },
+        {
+          "customer_name": "Stephanie White",
+          "total_gmv": 19500.0
+        },
+        {
+          "customer_name": "Chris Jackson",
+          "total_gmv": 18982.5
+        },
+        {
+          "customer_name": "Lisa Anderson",
+          "total_gmv": 18975.0
+        },
+        {
+          "customer_name": "Sarah Zhang",
+          "total_gmv": 18296.0
+        },
+        {
+          "customer_name": "Jennifer Davis",
+          "total_gmv": 16959.0
+        },
+        {
+          "customer_name": "Robert Miller",
+          "total_gmv": 12762.5
+        },
+        {
+          "customer_name": "David Lee",
+          "total_gmv": 11893.0
+        },
+        {
+          "customer_name": "Rachel Robinson",
+          "total_gmv": 11877.0
+        },
+        {
+          "customer_name": "Jason Walker",
+          "total_gmv": 11858.0
+        },
+        {
+          "customer_name": "Emily Johnson",
+          "total_gmv": 10690.0
+        },
+        {
+          "customer_name": "Andrew Lewis",
+          "total_gmv": 10398.0
+        },
+        {
+          "customer_name": "Brian Harris",
+          "total_gmv": 10199.0
+        },
+        {
+          "customer_name": "Michael Brown",
+          "total_gmv": 9566.0
+        },
+        {
+          "customer_name": "Amanda Garcia",
+          "total_gmv": 9362.0
+        },
+        {
+          "customer_name": "Jessica Wang",
+          "total_gmv": 9313.0
+        },
+        {
+          "customer_name": "Kevin Taylor",
+          "total_gmv": 9253.0
+        },
+        {
+          "customer_name": "Michelle Thomas",
+          "total_gmv": 9173.0
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Columns",
+        "Recall Values",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "What sells the most?",
+      "success": true,
+      "data": [
+        {
+          "product_name": "Horizon Organic Whole Milk 12-pack"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Where do we make the most money?",
+      "success": true,
+      "data": [
+        {
+          "region_name": "West"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Any big orders recently?",
+      "success": true,
+      "data": [],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": false,
+      "ex_reason": "Expected >= 1 rows, got 0"
+    },
+    {
+      "query": "How many unique customers placed orders?",
+      "success": true,
+      "data": [
+        {
+          "COUNT(DISTINCT customer_id)": 20
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Total revenue and order count by membership level",
+      "success": true,
+      "data": [
+        {
+          "member_level": "Gold",
+          "total_revenue": 100178.5,
+          "order_count": 34
+        },
+        {
+          "member_level": "Platinum",
+          "total_revenue": 57679.0,
+          "order_count": 25
+        },
+        {
+          "member_level": "Bronze",
+          "total_revenue": 50208.0,
+          "order_count": 26
+        },
+        {
+          "member_level": "Silver",
+          "total_revenue": 71094.0,
+          "order_count": 30
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Show all regions with sales above 50000",
+      "success": true,
+      "data": [
+        {
+          "region_name": "West"
+        },
+        {
+          "region_name": "Southeast"
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Tables",
+        "Filter Metrics",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Percentage of total sales by region",
+      "success": true,
+      "data": [
+        {
+          "region_name": "West",
+          "percentage_of_total_sales": 25.14763065559295
+        },
+        {
+          "region_name": "Southeast",
+          "percentage_of_total_sales": 21.568314888083695
+        },
+        {
+          "region_name": "Northeast",
+          "percentage_of_total_sales": 16.894642668438653
+        },
+        {
+          "region_name": "Midwest",
+          "percentage_of_total_sales": 14.722586908201226
+        },
+        {
+          "region_name": "South",
+          "percentage_of_total_sales": 11.293901873301822
+        },
+        {
+          "region_name": "Northwest",
+          "percentage_of_total_sales": 10.372923006381656
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Columns",
+        "Recall Metrics",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    },
+    {
+      "query": "Compare male vs female customers average order value by region",
+      "success": true,
+      "data": [
+        {
+          "region_name": "Midwest",
+          "gender": "Female",
+          "average_order_value": 2361.4166666666665
+        },
+        {
+          "region_name": "Midwest",
+          "gender": "Male",
+          "average_order_value": 1823.2142857142858
+        },
+        {
+          "region_name": "Northeast",
+          "gender": "Female",
+          "average_order_value": 2113.0
+        },
+        {
+          "region_name": "Northeast",
+          "gender": "Male",
+          "average_order_value": 3282.3333333333335
+        },
+        {
+          "region_name": "Northwest",
+          "gender": "Female",
+          "average_order_value": 2413.0833333333335
+        },
+        {
+          "region_name": "South",
+          "gender": "Female",
+          "average_order_value": 1979.5
+        },
+        {
+          "region_name": "South",
+          "gender": "Male",
+          "average_order_value": 2456.375
+        },
+        {
+          "region_name": "Southeast",
+          "gender": "Female",
+          "average_order_value": 2804.5384615384614
+        },
+        {
+          "region_name": "Southeast",
+          "gender": "Male",
+          "average_order_value": 1979.25
+        },
+        {
+          "region_name": "West",
+          "gender": "Female",
+          "average_order_value": 1781.6666666666667
+        },
+        {
+          "region_name": "West",
+          "gender": "Male",
+          "average_order_value": 2975.6
+        }
+      ],
+      "error": null,
+      "stages": [
+        "Extract Keywords",
+        "Recall Values",
+        "Recall Metrics",
+        "Recall Columns",
+        "Merge Retrieved Info",
+        "Filter Metrics",
+        "Filter Tables",
+        "Add Context",
+        "Generate SQL",
+        "Validate SQL",
+        "Execute SQL"
+      ],
+      "ex_passed": true,
+      "ex_reason": "All checks passed"
+    }
+  ]
+}

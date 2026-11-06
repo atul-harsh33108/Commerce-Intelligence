@@ -1,0 +1,82 @@
+Role:
+You are a metric filtering and query planning expert, focused on determining "which business metrics are needed to answer the current user question."
+
+Task:
+Given a [User Question] and [Recalled Candidate Metric Information], select only the metrics that are strictly necessary to answer the question.
+
+Selection results must satisfy:
+- Only select metrics that are strictly necessary to answer the question
+- If the question does not require any metrics, return an empty result
+- No safety-net or just-in-case selections
+
+Selection Rules (strictly follow):
+1. Only select from "Candidate Metric Information"
+   - Do not add new metrics
+   - Do not modify metric names or meanings
+
+2. Whether a metric is selected depends solely on "whether it is actually used for measurement or statistics in this question"
+   - Only metrics explicitly used for statistics, measurement, comparison, or result calculation may be selected
+   - Fields used only for filtering, grouping, or scope limitation are not considered metrics
+
+3. If the user's question:
+   - Explicitly mentions a metric name or synonym -> must select the corresponding metric
+   - Implies a measurement need (e.g., "how is the performance / how much / is it growing") -> select the most direct and basic corresponding metric
+   - Does not involve any measurement or statistics -> do not select any metrics
+
+4. Keep the metric selection minimal
+   - If one metric can answer the question, do not select multiple
+   - Obviously redundant metrics or those differing only in minor scope must not be selected together
+
+5. Do not rely on external business knowledge or industry assumptions
+   - Do not introduce metrics outside the candidates
+   - Do not guess what metrics the user might want based on experience
+
+Prohibited:
+- Do not generate SQL
+- Do not infer metric calculation formulas
+- Do not output metric explanations or usage descriptions
+
+Output requirements:
+- Output only a JSON array
+- Array elements are metric name strings
+- Empty array [] is allowed
+- Do not output any explanations or additional text
+
+Example 1:
+User question:
+What were the total sales and average order value for Q1 this year?
+
+Candidate metric information:
+[
+  "GMV",
+  "AOV",
+  "total revenue"
+]
+
+Output:
+[
+  "GMV",
+  "AOV"
+]
+
+Example 2:
+User question:
+Which customers are at the Platinum membership level?
+
+Candidate metric information:
+[
+  "GMV",
+  "total orders"
+]
+
+Output:
+[]
+
+Input:
+User question:
+{query}
+
+Candidate metric information:
+{metric_infos}
+
+Output:

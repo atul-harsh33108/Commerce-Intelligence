@@ -1,0 +1,85 @@
+# The agent, pointed at THIS project's warehouse.
+#
+# Every change from the source repository's version is a host name, a credential, or a database
+# number. There is no code change, which is the claim Step 9 makes and this file is the evidence for.
+
+logging:
+  file:
+    enable: true
+    level: INFO
+    path: logs
+    rotation: "10 MB"
+    retention: "7 days"
+  console:
+    enable: true
+    level: INFO
+
+# The metadata catalogue. Read-write, because the indexing job writes it.
+db_meta:
+  host: warehouse-db
+  port: 3306
+  user: warehouse
+  password: warehouse
+  database: meta
+
+# THE WAREHOUSE, THROUGH A READ-ONLY ACCOUNT (D12).
+#
+# `warehouse_ro` has SELECT on dw.* and nothing else - no INSERT, no UPDATE, no temporary tables, no
+# access to `meta`, and no account on any OLTP database. This is the boundary; the agent's own SQL
+# validator and the gateway's authentication are defence in depth on top of it.
+#
+# The distinction matters and is worth being able to state: a prompt-level guardrail is a mitigation,
+# a GRANT is a boundary. Generated SQL is untrusted input however good the model is.
+db_dw:
+  host: warehouse-db
+  port: 3306
+  user: warehouse_ro
+  password: warehouse_ro
+  database: dw
+
+qdrant:
+  host: qdrant
+  port: 6333
+  # 1024 = BAAI/bge-large-en-v1.5's output dimension. A mismatch here is not a startup error - it is
+  # a Qdrant collection created with the wrong vector size, and the failure appears at the first
+  # upsert with a message about dimensions that does not mention the model.
+  embedding_size: 1024
+
+embedding:
+  host: embedding
+  port: 80
+  model: BAAI/bge-large-en-v1.5
+
+es:
+  # SHARED with search-service's Elasticsearch, on a different index. That is a deliberate reuse
+  # rather than an oversight: they are the same workload (an inverted index over short strings) and
+  # one cluster on a laptop is enough. In production they would be separate domains, because a
+  # customer-facing search outage and an internal analytics outage should not be the same incident.
+  host: elasticsearch
+  port: 9200
+  index_name: ecommerce_agent_values
+
+redis:
+  host: redis
+  port: 6379
+  # DATABASE 1, NOT 0. Redis has no namespaces and db 0 holds catalog-service's cache and the
+  # gateway's rate-limit counters. The agent's cache keys would not collide by accident today, and
+  # "would not collide by accident" is not a boundary - a FLUSHDB run by either side is.
+  db: 1
+
+# Query and node-level execution logs. Its own PostgreSQL, following the same rule as every other
+# service on this platform: the thing that owns the data owns the database.
+db_logs:
+  host: agent-logs-db
+  port: 5432
+  user: agentlogs
+  password: agentlogs
+  database: query_logs
+
+llm:
+  model_name: gemini-2.5-flash
+  # FROM THE ENVIRONMENT, never from this file. The source repository had a live Gemini key
+  # committed in its config; that file was deliberately not copied here.
+  api_key: ${oc.env:GEMINI_API_KEY}
+  provider: google_genai
+  base_url: ""

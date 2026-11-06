@@ -1,0 +1,404 @@
+# The e-commerce warehouse, described for the NL->SQL agent.
+#
+# ================================================================================================
+# THIS FILE IS STEP 9.
+# ================================================================================================
+#
+# The agent was written against a different warehouse - a generic retail star schema with
+# dim_region / dim_customer / dim_product / dim_date / fact_order. Pointing it at THIS warehouse
+# needed no Python changes at all: the agent is metadata-driven, and this file plus a connection
+# string is the entire "port". That property is the reason the brief says "integrate, do not rebuild",
+# and it is worth checking rather than assuming - the diff against the agent's own source tree is
+# configuration and nothing else.
+#
+# WHAT THE AGENT DOES WITH THIS
+#
+#   1. `build_meta_knowledge` writes every table/column/metric into the `meta` MySQL database.
+#   2. Each column's description + aliases are embedded and indexed into Qdrant.
+#   3. Columns with `sync: true` have their DISTINCT VALUES pulled from the warehouse and loaded
+#      into Elasticsearch.
+#   4. At query time: keywords are extracted, Qdrant recalls candidate columns and metrics, ES
+#      recalls candidate VALUES, and only the relevant subset of schema goes into the prompt.
+#
+# Step 3 is the one people miss and it is what makes "orders from Sao Paulo" work: the user says a
+# VALUE, not a column, and something has to know that "Sao Paulo" lives in `dim_geography.state_name`.
+# It is also why `sync` is false on high-cardinality columns - indexing 33,100 product names would
+# bury the 27 state names that actually disambiguate a question.
+#
+# ALIASES ARE THE HIGHEST-LEVERAGE FIELD HERE. A user asks for "revenue"; the column is
+# `line_revenue`. A missing alias is a question the agent cannot answer no matter how good the model
+# is, because retrieval happens before generation.
+
+tables:
+  - name: dim_date
+    role: dim
+    description: >-
+      Calendar dimension, one row per day from 2015 to 2027. Join to fact_order_items on date_id.
+      Use this for any time-based grouping rather than applying date functions to the fact table.
+    columns:
+      - name: date_id
+        role: primary_key
+        description: Date key in yyyyMMdd integer form, e.g. 20180915.
+        alias: [date ID, date key]
+        sync: false
+      - name: full_date
+        role: dimension
+        description: The calendar date itself, as a DATE.
+        alias: [date, day, calendar date, order date]
+        sync: false
+      - name: year
+        role: dimension
+        description: Four-digit calendar year.
+        alias: [year, annual]
+        sync: false
+      - name: quarter
+        role: dimension
+        description: Calendar quarter, 1 to 4.
+        alias: [quarter, Q1, Q2, Q3, Q4]
+        sync: false
+      - name: month
+        role: dimension
+        description: Calendar month number, 1 to 12.
+        alias: [month, month number]
+        sync: false
+      - name: month_name
+        role: dimension
+        description: Month name in English, e.g. September.
+        alias: [month name]
+        # 12 values. Worth indexing precisely because a user says "September" and not "month = 9".
+        sync: true
+      - name: month_key
+        role: dimension
+        description: >-
+          Year and month as yyyy-MM, e.g. 2018-09. Prefer this for monthly grouping - it sorts
+          correctly as a string and needs no date function.
+        alias: [year month, month key, monthly]
+        sync: false
+      - name: day_of_week
+        role: dimension
+        description: Day of week, 1 = Monday through 7 = Sunday.
+        alias: [weekday, day of week]
+        sync: false
+      - name: is_weekend
+        role: dimension
+        description: 1 when the date falls on a Saturday or Sunday, otherwise 0.
+        alias: [weekend, weekday or weekend]
+        sync: false
+
+  - name: dim_product
+    role: dim
+    description: >-
+      Product dimension, one row per product in the catalogue. Join to fact_order_items on
+      product_id. Note that the Olist source dataset has no real product names - product_name is
+      derived from the category, so questions about specific products should filter on category.
+    columns:
+      - name: product_id
+        role: primary_key
+        description: Surrogate product key used by the fact table.
+        alias: [product ID]
+        sync: false
+      - name: product_key
+        role: dimension
+        description: The source system's 32-character product identifier.
+        alias: [product code, product key, SKU]
+        sync: false
+      - name: product_name
+        role: dimension
+        description: Display label, derived from the category. Not a real product name.
+        alias: [product name, item name]
+        sync: false
+      - name: category
+        role: dimension
+        description: >-
+          Product category in English, e.g. health_beauty, computers_accessories, bed_bath_table.
+          There are 71 categories. This is the main way products are grouped.
+        alias: [category, product category, product type, department]
+        # 71 values, and the single most useful thing to index: almost every product question is
+        # really a category question, because the source data has no product names.
+        sync: true
+      - name: category_pt
+        role: dimension
+        description: The original Portuguese category name from the source dataset.
+        alias: [portuguese category, original category]
+        sync: false
+      - name: unit_price
+        role: measure
+        description: >-
+          Current catalogue price in Brazilian reais. For what a product actually SOLD at, use
+          fact_order_items.unit_price instead - that is the price at the time of the order.
+        alias: [catalogue price, list price, current price]
+        sync: false
+      - name: weight_g
+        role: dimension
+        description: Product weight in grams.
+        alias: [weight, product weight]
+        sync: false
+      - name: is_active
+        role: dimension
+        description: 1 when the product is currently for sale, 0 when it has never sold or is withdrawn.
+        alias: [active, available, on sale]
+        sync: false
+
+  - name: dim_customer
+    role: dim
+    description: >-
+      Customer dimension. Join to fact_order_items on customer_id. IMPORTANT - there are two
+      identifiers, customer_key is unique per ORDER and customer_unique_key is unique per PERSON.
+      Count distinct customer_unique_key to count people.
+    columns:
+      - name: customer_id
+        role: primary_key
+        description: Surrogate customer key used by the fact table.
+        alias: [customer ID]
+        sync: false
+      - name: customer_key
+        role: dimension
+        description: >-
+          Source customer identifier. One per ORDER, not per person - do not count distinct on this
+          to count customers.
+        alias: [customer code, customer key]
+        sync: false
+      - name: customer_unique_key
+        role: dimension
+        description: >-
+          Source identifier for the actual PERSON, stable across their orders. Use
+          COUNT(DISTINCT customer_unique_key) for the number of customers, and use it to find repeat
+          buyers.
+        alias: [unique customer, person, distinct customer, repeat customer]
+        sync: false
+      - name: city
+        role: dimension
+        description: Customer city, lowercase, e.g. sao paulo, rio de janeiro.
+        alias: [city, town, customer city]
+        # ~4,000 values. Indexed anyway: city is a question people actually ask, and without it
+        # "orders from Curitiba" has nothing to match on.
+        sync: true
+      - name: state
+        role: dimension
+        description: >-
+          Two-letter Brazilian federative unit code, e.g. SP for Sao Paulo, RJ for Rio de Janeiro,
+          MG for Minas Gerais. THIS IS THE CANONICAL COLUMN FOR STATE-LEVEL QUESTIONS - grouping,
+          counting or filtering by state should use it rather than dim_geography.state_name, which
+          is a lookup table and includes an 'Unknown' member.
+        alias: [state, state code, UF, federative unit, which state, by state, per state]
+        sync: true
+
+  - name: dim_geography
+    role: dim
+    description: >-
+      Brazilian REGIONS and the states that belong to them. Join to fact_order_items on
+      geography_id. Use this table when the question is about a REGION (Southeast, South,
+      Northeast, North, Central-West). For a question about STATES, use dim_customer.state instead -
+      that is one row per customer and is the canonical source for state-level grouping and
+      counting. IMPORTANT: this table contains an extra 'Unknown' member (geography_id 999,
+      state_code '??') for facts whose customer has no recorded state, so COUNT(DISTINCT ...) over
+      this table is one higher than the number of real Brazilian states.
+    columns:
+      - name: geography_id
+        role: primary_key
+        description: Surrogate geography key used by the fact table. 999 means unknown.
+        alias: [geography ID, region ID]
+        sync: false
+      - name: state_code
+        role: dimension
+        description: Two-letter state code, e.g. SP.
+        alias: [state code, UF]
+        sync: true
+      - name: state_name
+        role: dimension
+        description: >-
+          Full state name, e.g. Sao Paulo, Minas Gerais, Rio Grande do Sul. A lookup label for
+          displaying a region's states. For grouping or counting BY state, prefer
+          dim_customer.state - this column includes an 'Unknown' member and is one row per state
+          rather than one per customer.
+        alias: [state name, full state name, province]
+        sync: true
+      - name: region
+        role: dimension
+        description: >-
+          Brazilian region. One of Southeast, South, Northeast, North, Central-West, or Unknown.
+        alias: [region, area, zone, geographic region]
+        sync: true
+
+  - name: fact_order_items
+    role: fact
+    description: >-
+      The fact table. One row per LINE of an order - an order with three different products is three
+      rows. Every revenue and volume question is answered from here. Join to the dimensions on
+      date_id, product_id, customer_id and geography_id.
+    columns:
+      - name: order_key
+        role: dimension
+        description: >-
+          The order this line belongs to. Use COUNT(DISTINCT order_key) to count ORDERS - counting
+          rows counts order lines, which is a larger number.
+        alias: [order ID, order number, order]
+        sync: false
+      - name: line_no
+        role: dimension
+        description: Line number within the order, starting at 1.
+        alias: [line number, item number]
+        sync: false
+      - name: date_id
+        role: foreign_key
+        description: Foreign key to dim_date. The date the order was placed.
+        alias: [date, order date]
+        sync: false
+      - name: product_id
+        role: foreign_key
+        description: Foreign key to dim_product.
+        alias: [product]
+        sync: false
+      - name: customer_id
+        role: foreign_key
+        description: Foreign key to dim_customer.
+        alias: [customer]
+        sync: false
+      - name: geography_id
+        role: foreign_key
+        description: Foreign key to dim_geography.
+        alias: [region, geography]
+        sync: false
+      - name: order_status
+        role: dimension
+        description: >-
+          Fulfilment status of the order. DELIVERED is by far the most common; others are SHIPPED,
+          CANCELED, UNAVAILABLE, INVOICED, PROCESSING, CREATED, APPROVED, and for orders placed
+          through this platform PENDING, AWAITING_PAYMENT and CONFIRMED. Filter to DELIVERED for
+          completed-sales questions.
+        alias: [status, order status, delivered, cancelled]
+        sync: true
+      - name: quantity
+        role: measure
+        description: Units of the product on this line.
+        alias: [quantity, units, volume, how many]
+        sync: false
+      - name: unit_price
+        role: measure
+        description: >-
+          Price per unit in Brazilian reais AT THE TIME OF THE ORDER. This is the price to use for
+          historical revenue, not dim_product.unit_price.
+        alias: [price, unit price, sale price]
+        sync: false
+      - name: freight_amount
+        role: measure
+        description: Shipping cost for this line in Brazilian reais.
+        alias: [freight, shipping, delivery cost, postage]
+        sync: false
+      - name: line_revenue
+        role: measure
+        description: >-
+          quantity multiplied by unit_price, EXCLUDING freight. This is the standard revenue measure -
+          sum it for total sales.
+        alias: [revenue, sales, sales amount, turnover, GMV, gross merchandise value]
+        sync: false
+      - name: line_total
+        role: measure
+        description: line_revenue plus freight_amount - what the customer paid for this line.
+        alias: [total, order total, amount paid, total with shipping]
+        sync: false
+      - name: delivery_days
+        role: measure
+        description: >-
+          Days from order placement to delivery. NULL when the order was never delivered - exclude
+          NULLs when averaging.
+        alias: [delivery time, days to deliver, shipping time, lead time]
+        sync: false
+      - name: estimated_days
+        role: measure
+        description: Days from order placement to the ESTIMATED delivery date given to the customer.
+        alias: [estimated delivery, promised delivery time]
+        sync: false
+      - name: is_late
+        role: dimension
+        description: >-
+          1 when the order was delivered after its estimated date, 0 when on time, NULL when not yet
+          delivered. Filter is_late = 1 for late deliveries; treat NULL as "unknown", not "on time".
+        alias: [late, delayed, overdue, missed delivery date, on time]
+        sync: false
+      - name: purchased_at
+        role: dimension
+        description: Timestamp the order was placed.
+        alias: [order time, purchase time, when ordered]
+        sync: false
+
+# ================================================================================================
+# METRICS
+#
+# A metric is a named business definition, stored as DATA rather than left in a prompt. That is the
+# difference between an agent that computes "average order value" consistently and one that invents
+# a plausible formula each time - and AOV in particular is a formula people disagree about
+# (per order or per line? including freight or not?). Writing it down once is the whole point.
+#
+# RULE FOR ANY RATE OR SHARE: say PERCENTAGE and write the * 100.0 into the description.
+#
+# This is not pedantry - it cost two evaluation failures. The original wording was "Share of
+# delivered orders ... SUM(is_late) / COUNT(is_late)", the model did exactly that, and returned
+# 0.0791 to a question that asked for a percentage. The number was right and the answer was wrong,
+# which is the most expensive kind of near-miss because it looks plausible on a dashboard.
+# ================================================================================================
+metrics:
+  - name: Revenue
+    description: >-
+      Total sales value, excluding shipping. SUM(fact_order_items.line_revenue). Filter
+      order_status = 'DELIVERED' for completed sales only.
+    relevant_columns:
+      - fact_order_items.line_revenue
+    alias: [revenue, total sales, sales, turnover, GMV, gross merchandise value, income]
+
+  - name: Order Count
+    description: >-
+      Number of distinct orders, COUNT(DISTINCT fact_order_items.order_key). NOT the row count -
+      one order can have several lines.
+    relevant_columns:
+      - fact_order_items.order_key
+    alias: [orders, number of orders, order count, how many orders, order volume]
+
+  - name: Average Order Value
+    description: >-
+      Revenue divided by the number of distinct orders -
+      SUM(line_total) / COUNT(DISTINCT order_key). Uses line_total, so it includes freight, which is
+      what the customer actually paid.
+    relevant_columns:
+      - fact_order_items.line_total
+      - fact_order_items.order_key
+    alias: [AOV, average order value, average basket, average spend, average ticket]
+
+  - name: Units Sold
+    description: Total units shipped, SUM(fact_order_items.quantity).
+    relevant_columns:
+      - fact_order_items.quantity
+    alias: [units, units sold, quantity sold, volume]
+
+  - name: Customer Count
+    description: >-
+      Number of distinct PEOPLE, COUNT(DISTINCT dim_customer.customer_unique_key). Using
+      customer_key instead counts orders, not customers.
+    relevant_columns:
+      - dim_customer.customer_unique_key
+    alias: [customers, number of customers, unique customers, buyers, shoppers]
+
+  - name: Late Delivery Rate
+    description: >-
+      The PERCENTAGE of delivered order lines that arrived after the estimated date, expressed as a
+      number between 0 and 100 - SUM(is_late) * 100.0 / COUNT(is_late). Count only rows where
+      is_late is not NULL, because NULL means not yet delivered rather than on time. Always multiply
+      by 100: a question asking for a percentage wants 7.91, not 0.0791.
+    relevant_columns:
+      - fact_order_items.is_late
+    alias: [late rate, late deliveries, delivery delay rate, on-time rate, punctuality,
+            percentage late, percent late, share of late deliveries]
+
+  - name: Average Delivery Time
+    description: >-
+      Mean days from order to delivery, AVG(fact_order_items.delivery_days), ignoring NULLs
+      (undelivered orders).
+    relevant_columns:
+      - fact_order_items.delivery_days
+    alias: [delivery time, average delivery, shipping speed, how long delivery takes]
+
+  - name: Freight Cost
+    description: Total shipping charged, SUM(fact_order_items.freight_amount).
+    relevant_columns:
+      - fact_order_items.freight_amount
+    alias: [freight, shipping cost, delivery cost, postage]
