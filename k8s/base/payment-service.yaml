@@ -1,0 +1,159 @@
+# payment-service
+#
+# NOT APPLIED TO ANY CLUSTER. See k8s/README.md: these manifests are written from the deployment that
+# actually runs under `docker compose --profile apps`, and validated only by
+# `kubectl apply --dry-run=client`, which checks schema and nothing else. Saying more than that is
+# the kind of claim docs/reflection.md exists to stop.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  labels: { app: payment-service, part-of: ecommerce }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: payment-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # maxUnavailable 0: never give up capacity during a deploy. At replicas 2 the default of 25%
+      # rounds to 1, so half the service is gone while the replacement starts - and a Spring Boot pod
+      # takes about thirty seconds to start.
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels: { app: payment-service, part-of: ecommerce }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8085"
+    spec:
+      # 45 s, against a default of 30. These services have real shutdown work: stop accepting, drain
+      # in-flight requests, commit consumer offsets, leave the consumer group. Killed at 30 s a
+      # consumer leaves by session timeout instead, which stalls its partitions for everyone else.
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: payment-service
+          image: ecommerce/payment-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8085 }
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: CONFIG_SERVER_URL
+              value: "http://config-server:8888"
+            - name: EUREKA_URL
+              value: "http://discovery-server:8761/eureka/"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: ZIPKIN_ENDPOINT
+              value: "http://zipkin:9411/api/v2/spans"
+            - name: DB_URL
+              value: "jdbc:postgresql://payment-db:5432/paymentdb"
+            # The credential comes from a Secret and never from this file. See
+            # k8s/base/secrets.example.yaml for how it is created, and for why the example
+            # is the only version of it in git.
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef: { name: payment-service-db, key: username }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: payment-service-db, key: password }
+          resources:
+            # Requests are what the scheduler packs against; limits are what the kernel enforces.
+            #
+            # NO CPU LIMIT, deliberately. A CPU limit throttles at the cgroup period, and a JVM
+            # throttled mid-GC produces latency spikes indistinguishable from a slow dependency. The
+            # memory limit stays, because memory is not compressible - a container over it must die,
+            # and MaxRAMPercentage in the image sizes the heap from that same number.
+            requests: { cpu: 200m, memory: 512Mi }
+            limits: { memory: 768Mi }
+          # THREE PROBES DOING THREE DIFFERENT JOBS. Pointing all of them at /actuator/health is the
+          # classic mistake: that endpoint aggregates the datasource, so a database outage marks every
+          # replica unhealthy and Kubernetes restarts all of them, repeatedly, for a problem no
+          # restart can fix.
+          startupProbe:
+            # Buys the JVM up to 150 s to start, without making the liveness probe lenient forever.
+            httpGet: { path: /actuator/health/readiness, port: 8085 }
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            # "Is this process broken beyond recovery?" -> restart it. Deliberately does NOT consult
+            # dependencies.
+            httpGet: { path: /actuator/health/liveness, port: 8085 }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            # "Can it serve traffic right now?" -> route to it, or stop. This one DOES consult
+            # dependencies: a service whose database is down should leave the Service endpoints, not
+            # be killed.
+            httpGet: { path: /actuator/health/readiness, port: 8085 }
+            periodSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            # readOnlyRootFilesystem means /tmp has to be supplied. The JVM writes perf
+            # data there and Tomcat writes multipart temp files; without it the container
+            # starts and then fails on the first upload.
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  labels: { app: payment-service }
+spec:
+  # ClusterIP. Nothing is reachable from outside the cluster except through the gateway's Ingress,
+  # which is what makes "the gateway is the only way in" structural rather than a convention people
+  # are asked to respect.
+  type: ClusterIP
+  selector: { app: payment-service }
+  ports:
+    - { name: http, port: 8085, targetPort: 8085 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: payment-service }
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+  behavior:
+    scaleDown:
+      # Five minutes of stability before scaling down. Without it a bursty workload scales down
+      # between bursts and pays a thirty-second JVM start on every one - flapping that costs more
+      # than the pod it saves.
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      stabilizationWindowSeconds: 30
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-service
+spec:
+  # One pod may be evicted at a time. With no PDB a node drain is entitled to take every replica of a
+  # service at once, because nothing told the cluster otherwise.
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: payment-service }

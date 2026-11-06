@@ -1,0 +1,101 @@
+# Namespace, configuration, and the network boundary the rest of the platform assumes.
+#
+# NOT APPLIED TO ANY CLUSTER — see k8s/README.md.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce
+  labels:
+    part-of: ecommerce
+---
+# The config repo, as a ConfigMap.
+#
+# Generated rather than hand-maintained, because a copy of nine YAML files pasted into a tenth is a
+# copy that will drift the first time somebody edits the original:
+#
+#   kubectl create configmap config-repo \
+#     --from-file=ecommerce-platform/config-repo/ \
+#     --dry-run=client -o yaml > k8s/base/configmap-generated.yaml
+#
+# Kustomize's configMapGenerator does the same thing and also appends a content hash to the name,
+# which makes a config change roll the pods that read it. Without that, editing a ConfigMap changes
+# the mounted files and nothing restarts — the classic "I changed the config and nothing happened".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-repo
+  annotations:
+    note: |
+      Placeholder. Generate the real one with the kubectl command above; it is not committed because
+      a stale copy of the config repo is worse than no copy.
+data:
+  README: "generated at deploy time from ecommerce-platform/config-repo/"
+---
+# Default-deny, then allow what the architecture actually needs.
+#
+# THIS IS WHAT MAKES "THE GATEWAY IS THE ONLY WAY IN" TRUE. Everywhere else in this project that
+# claim rests on the services' own filter chains, which is defence in depth and not a boundary: the
+# service ports are open, and anything inside the cluster can reach them. Here it becomes structural.
+#
+# It also matters for actuator. Every service serves /actuator/prometheus without a token, and the
+# reasoning recorded in each SecurityConfig is explicitly "the boundary is the Service definition,
+# not this filter chain". This policy is that boundary. Without it, that comment is describing
+# something that does not exist.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: ecommerce
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-traffic
+  namespace: ecommerce
+spec:
+  podSelector:
+    matchLabels: { part-of: ecommerce }
+  policyTypes: [Ingress]
+  ingress:
+    # Service-to-service, within the platform only.
+    - from:
+        - podSelector:
+            matchLabels: { part-of: ecommerce }
+    # Prometheus, which lives in the monitoring namespace and must reach every actuator port.
+    - from:
+        - namespaceSelector:
+            matchLabels: { name: monitoring }
+      ports:
+        - { protocol: TCP, port: 9090 }
+---
+# The one door. Only the gateway has an Ingress; the other eight Services are ClusterIP with no
+# route from outside, which is the same arrangement the compose file has and the same one the
+# gateway's own config assumes.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  namespace: ecommerce
+  annotations:
+    # SSE. The analytics route streams, and an ingress that buffers turns "streamed live" into
+    # "delivered all at once at the end" — which looks identical in curl and is the whole
+    # user-visible point of the feature. The same trap the gateway itself has a
+    # RemoveResponseHeader filter for; fixing it in one place and not the other fixes nothing.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: shop.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port: { number: 8080 }
