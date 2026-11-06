@@ -162,8 +162,7 @@ flowchart TB
   KAFKA --> PAY
   AGENT --> MYSQL
 
-  linkStyle 0 stroke:#be185d,stroke-width:2px;
-  linkStyle 1 stroke:#be185d,stroke-width:2px;
+  linkStyle 0,1 stroke:#be185d,stroke-width:2px;
   linkStyle 2 stroke:#0369a1,stroke-dasharray:4 3;
 ```
 
@@ -345,7 +344,9 @@ flowchart TB
   N5 --> GEM
   EP --> LOGS
 
-  linkStyle 5,6,7 stroke:#b45309;
+  linkStyle 5 stroke:#b45309;
+  linkStyle 6 stroke:#b45309;
+  linkStyle 7 stroke:#b45309;
   linkStyle 8 stroke:#6d28d9;
 ```
 
