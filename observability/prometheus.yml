@@ -1,0 +1,54 @@
+# What Prometheus scrapes, and why the targets are hardcoded.
+#
+# NO SERVICE DISCOVERY, deliberately. Every service registers with Eureka and Prometheus can be
+# taught to read it, but that means a second source of truth about what exists and a failure mode
+# where a service disappears from monitoring because it deregistered - which is precisely the moment
+# you want its metrics. In Kubernetes this file becomes a ServiceMonitor selecting on a label, which
+# is discovery done by the thing that already owns lifecycle. On a laptop, a list is honest.
+#
+# `host.docker.internal` because the Java services are host JVMs started by scripts/dev-stack.ps1,
+# not containers. Prometheus is a container; it reaches them through the gateway host.
+
+global:
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  external_labels:
+    environment: local
+
+scrape_configs:
+  - job_name: platform
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8081
+        labels: { service: user-service }
+      - targets:
+          - host.docker.internal:8082
+        labels: { service: catalog-service }
+      - targets:
+          - host.docker.internal:8083
+        labels: { service: inventory-service }
+      - targets:
+          - host.docker.internal:8084
+        labels: { service: order-service }
+      - targets:
+          - host.docker.internal:8085
+        labels: { service: payment-service }
+      - targets:
+          - host.docker.internal:8086
+        labels: { service: search-service }
+      # 9090, not 8080. The gateway serves actuator on a separate management port so that no route
+      # through the edge can reach it - see the comment in config-repo/api-gateway.yml.
+      - targets:
+          - host.docker.internal:9090
+        labels: { service: api-gateway }
+      - targets:
+          - host.docker.internal:8888
+        labels: { service: config-server }
+      - targets:
+          - host.docker.internal:8761
+        labels: { service: discovery-server }
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

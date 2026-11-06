@@ -1,0 +1,19 @@
+# Provisioned, not clicked. A dashboard that only exists in someone's browser is not part of the
+# repository, and "it works on my Grafana" is the same class of problem as "it works on my machine".
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 10s
+
+  - name: Zipkin
+    type: zipkin
+    uid: zipkin
+    access: proxy
+    url: http://zipkin:9411

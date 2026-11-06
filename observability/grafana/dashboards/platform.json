@@ -1,0 +1,283 @@
+{
+  "uid": "ecommerce-platform",
+  "title": "E-commerce platform",
+  "description": "Every panel is a question someone asked while debugging this platform. Panels carry the caveat that applies to them - a dashboard whose numbers are trusted unconditionally is how Step 6 stayed broken for four steps.",
+  "tags": [
+    "platform"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate by service",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(http_server_requests_seconds_count[1m]))",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "description": "Requests per second, from every service's own Micrometer registry. `service` is the label Prometheus attaches at scrape time (see observability/prometheus.yml), not something the application reports about itself."
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "p99 latency by service",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (service, le) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "Computed with histogram_quantile over the HISTOGRAM, not averaged from each service's own p99. Averaging quantiles is meaningless - this is why `management.metrics.distribution.percentiles-histogram` is enabled platform-wide rather than each service publishing a precomputed percentile."
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Errors per second (5xx)",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "description": "5xx only. 4xx is a client being told no, which is the system working."
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Cache hit ratio (catalog-service)",
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(cache_gets_total{result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total[5m])), 0.001)",
+          "legendFormat": "hit ratio",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "description": "Counts a LOOKUP, not a usable value. Step 11 found a cache with a 100% hit rate in which every hit threw a ClassCastException - this panel was green throughout. Read it next to the 5xx panel, never alone."
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Circuit breaker state",
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "resilience4j_circuitbreaker_state{state=\"open\"}",
+          "legendFormat": "{{service}} {{name}} open",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "description": "1 = open. A breaker that is open is a dependency that has already failed enough times to be refused in microseconds instead of waited on for seconds."
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Kafka consumer lag",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, topic) (kafka_consumer_fetch_manager_records_lag)",
+          "legendFormat": "{{topic}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "description": "Records behind the log end. The saga's freshness is this number; a lag that grows without bound is a consumer that has stopped, not a consumer that is slow."
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Outbox depth (unpublished events)",
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (outbox_pending)",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "description": "THE number to alert on. If the relay stops, nothing else degrades: HTTP stays fast, orders keep committing, every other panel stays green - and no event reaches Kafka. Steady state is 0 or a handful; a value that only rises means the relay is not publishing at all."
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "JVM heap used",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "HikariCP connections in use",
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (hikaricp_connections_active)",
+          "legendFormat": "{{service}}",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "description": "Against a pool of 10 per service. Saturation here looks exactly like 'the database is slow' from the outside and is neither the database nor slow."
+    }
+  ]
+}
