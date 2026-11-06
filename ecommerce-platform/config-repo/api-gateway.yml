@@ -1,0 +1,223 @@
+# api-gateway, all profiles.
+
+server:
+  # The only port a client needs. The service ports (8081-8086) keep working in development, which is
+  # not the same as being *supposed* to be reachable - the services still verify every token
+  # themselves for exactly that reason. In Kubernetes a NetworkPolicy makes this the only way in.
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # ORDER MATTERS. Predicates are evaluated top to bottom and the first match wins, so a
+          # broad path placed above a narrow one silently swallows it. Nothing warns; requests just
+          # arrive at the wrong service.
+          #
+          # `lb://` rather than a host and port. The load-balancer client resolves the name against
+          # Eureka and picks an instance PER REQUEST. A fixed address names one process; a Kubernetes
+          # Service name would load-balance per *connection*, which a pooled reactive gateway defeats
+          # by keeping one connection alive forever. This is the only one of the three that
+          # distributes traffic across replicas of a service the gateway talks to constantly.
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/auth/**,/api/users/**
+              filters:
+                # RATE LIMITING, and only on this route.
+                #
+                # /api/auth is the platform's only unauthenticated write path, and bcrypt at cost 10
+                # is ~100 ms of CPU per attempt BY DESIGN - so an unthrottled login endpoint is a
+                # CPU-exhaustion vector as much as a credential-stuffing one.
+                #
+                # The token bucket is a Lua script running inside Redis, so "check and decrement" is
+                # one atomic round trip. An in-process counter would limit each gateway INSTANCE,
+                # which means the effective limit changes every time the autoscaler moves.
+                - name: RequestRateLimiter
+                  args:
+                    # 5/second sustained, 10 in a burst. A human logging in needs one request; a
+                    # script trying a password list needs thousands. The burst is what stops a page
+                    # that fires several calls on load from tripping it.
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    # One token per request. Weighting an expensive endpoint higher is possible and
+                    # is not done here, because the two endpoints behind this route cost the same.
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@clientIpKeyResolver}"
+
+            - id: catalog-service
+              uri: lb://catalog-service
+              predicates:
+                - Path=/api/products/**,/api/categories/**
+
+            - id: inventory-service
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/inventory/**
+
+            - id: order-service
+              uri: lb://order-service
+              predicates:
+                - Path=/api/orders/**,/api/carts/**
+
+            - id: payment-service
+              uri: lb://payment-service
+              predicates:
+                - Path=/api/payments/**
+
+            - id: search-service
+              uri: lb://search-service
+              predicates:
+                - Path=/api/search/**
+
+            # The NL->SQL agent. NOT an lb:// route: it is a Python process that does not register
+            # with Eureka, and making it register would mean embedding a Eureka client in a FastAPI
+            # app to solve a problem it does not have (there is one of it, and its address is known).
+            #
+            # Routed through the gateway anyway, and that is the point of Step 9: the admin dashboard
+            # sends the same JWT it sends everywhere else, this filter chain authenticates it, and
+            # the agent is reachable on exactly one path with exactly one credential story. An agent
+            # exposed directly on :8000 would be an unauthenticated door into the warehouse.
+            # TWO ROUTES FOR ONE SERVICE, and the order between them is load-bearing.
+            #
+            # The agent serves /api/query, /api/tables, /api/schema/{t} - and /health, WITHOUT the
+            # /api prefix. One rewrite rule cannot map both shapes, so there are two routes and the
+            # narrower one is declared first, because the first matching predicate wins.
+            #
+            # This was originally one route rewriting /api/analytics/(.*) -> /$1, which produced
+            # /query - a path the agent does not serve. It went unnoticed because the only endpoint
+            # tested was /api/analytics/health, and that is precisely the one path where the wrong
+            # rule happens to produce a valid URL. Verifying an integration through its health
+            # endpoint verifies the health endpoint.
+            - id: analytics-agent-health
+              uri: ${app.services.agent.url}
+              predicates:
+                - Path=/api/analytics/health
+              filters:
+                - SetPath=/health
+
+            - id: analytics-agent
+              uri: ${app.services.agent.url}
+              predicates:
+                - Path=/api/analytics/**
+              filters:
+                # /api/analytics/query -> /api/query. `/api/analytics` is this platform's name for
+                # the service; rewriting here rather than renaming the agent's own routes keeps it a
+                # service this project integrates rather than forks.
+                - RewritePath=/api/analytics/(?<segment>.*), /api/$\{segment}
+                # SSE. Without this the gateway buffers the response and the "streamed live"
+                # requirement quietly becomes "delivered all at once at the end" - which looks
+                # identical in curl and is the whole user-visible point of the feature.
+                - RemoveResponseHeader=Content-Length
+              metadata:
+                # A PER-ROUTE override of the global 10s response timeout, and the only honest place
+                # to put it: an LLM round trip plus a warehouse query legitimately takes tens of
+                # seconds, while a catalog read taking 10s is a bug. One global number cannot be
+                # right for both.
+                #
+                # It lives here rather than in api-gateway-dev.yml because a list in two property
+                # sources does not merge - see the warning at the top of that file.
+                response-timeout: 120000
+                connect-timeout: 2000
+
+          # NOTHING routes /actuator/**, and that is the point rather than an omission. Every route
+          # above starts /api, so there is no path from port 8080 to any service's actuator. The
+          # gateway's own /actuator is on a separate port entirely (see `management` below).
+
+          # CORS, configured once, here, and nowhere else.
+          #
+          # It belongs at the edge because it is a property OF the edge - "which web origins may a
+          # browser let talk to this API" is a question about the front door. Six services would
+          # otherwise need six identical blocks, and a browser calling two of them would be at the
+          # mercy of whichever was last edited.
+          #
+          # WHAT CORS IS NOT: access control. It is a *browser* mechanism. curl ignores it entirely,
+          # and so does every server-side client and every attacker. Removing an origin below stops a
+          # page on that origin from reading responses in a browser; it stops nothing else.
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                # Explicit origins, not `*`. `*` works here only because this API authenticates with
+                # a bearer header rather than a cookie - a browser refuses to combine `*` with
+                # credentials at all. Naming them keeps "who may embed this API in a page"
+                # reviewable, and makes adding one a visible commit.
+                # Comma-separated and overridable, because the origin is a property of WHERE this
+                # is deployed, not of the code. A deployment on a public host serves the SPA from
+                # `http://<host>:30081`, and with the list hardcoded to localhost every request from
+                # that page fails a preflight - the symptom being a browser console message about
+                # CORS rather than anything naming the deployment.
+                #
+                # Spring binds a comma-separated environment variable to a List, so
+                # CORS_ALLOWED_ORIGINS="http://a,http://b" works without a second config file.
+                # The default keeps local development exactly as it was.
+                allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:4173}
+                allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+                # `Authorization` has to be listed. It is not a CORS-safelisted header, so without it
+                # every authenticated request from a browser fails the preflight - and the symptom is
+                # a console message about CORS rather than anything mentioning the token.
+                allowed-headers: [Authorization, Content-Type, Accept, X-Idempotency-Key]
+                # SSE needs the browser to be allowed to read this one on the response.
+                exposed-headers: [Content-Type]
+                # False, deliberately. Cookies are not how this platform authenticates, and
+                # allow-credentials true is what makes a permissive origin list dangerous rather than
+                # merely untidy.
+                allow-credentials: false
+                max-age: 3600
+
+          httpclient:
+            # An unbounded gateway is worse than an unbounded client: it holds the CUSTOMER's
+            # connection open too, so one slow service exhausts the edge and takes down routes that
+            # have nothing to do with it.
+            connect-timeout: 2000
+            # 10s is a compromise, and the agent is why. An LLM round trip plus a warehouse query
+            # legitimately takes seconds; a catalog read taking 10s is a bug. Per-route timeouts
+            # would be better and Spring Cloud Gateway supports them per route via metadata - see
+            # the response-timeout override on the analytics route in api-gateway-dev.yml.
+            response-timeout: 10s
+            pool:
+              # A CONNECTION POOL DEFEATS A KUBERNETES SERVICE. kube-proxy picks a backend pod when
+              # the TCP connection is established, and every request on that connection then goes to
+              # the same pod for as long as it lives; Netty's pool keeps connections alive
+              # indefinitely. `lb://` routes are immune because the load-balancer chooses per request
+              # before the pool is consulted - but the agent route above is a fixed URI and is not,
+              # so the setting stays.
+              max-life-time: 10s
+              max-idle-time: 5s
+
+management:
+  # A SEPARATE PORT, and this one is a fix rather than a flourish.
+  #
+  # Every service enforces ADMIN-only actuator in its Spring Security filter chain. The gateway has
+  # no filter chain - EdgeAuthenticationFilter is a GlobalFilter, and a GlobalFilter runs only for
+  # requests the route table matched. /actuator is served by a different handler mapping, so the
+  # filter never sees it and `curl localhost:8080/actuator/env` would return 200 with the platform's
+  # configuration in it, on the one component facing the public internet.
+  #
+  # Serving actuator on a different port is stronger than adding a security starter and rebuilding
+  # the same rule: there is no rule to get wrong, and in Kubernetes only 8080 is named in the
+  # Service, so 9090 is unreachable from outside the pod by construction rather than by policy.
+  server:
+    port: 9090
+  endpoints:
+    web:
+      exposure:
+        # `gateway` lists the live routes, which is the first thing to look at when a request lands
+        # somewhere unexpected.
+        include: health,info,refresh,env,loggers,metrics,gateway,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    gateway:
+      # Exposing an endpoint is not the same as enabling it, and `gateway` is the one that catches
+      # people out: since Spring Cloud Gateway 4.x it defaults to NONE access even when listed under
+      # `exposure.include`, so /actuator/gateway/routes answers 404 and looks like a missing
+      # dependency. Boot 3.4 also renamed the switch from `enabled: true` to `access:`.
+      #
+      # Unrestricted here because this endpoint lives on the management port, which nothing outside
+      # the pod can reach. `read-only` would be the choice if it shared a port with traffic: the
+      # endpoint has POST operations that can refresh the route table at runtime.
+      access: unrestricted

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ecommerce</groupId>
+        <artifactId>ecommerce-platform</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>api-gateway</artifactId>
+    <name>api-gateway</name>
+    <description>The platform's single front door; owns no data and no business rules</description>
+
+    <dependencies>
+        <!--
+          Gateway is REACTIVE. It brings spring-boot-starter-webflux, and adding
+          spring-boot-starter-web alongside it makes Boot start a servlet container instead and the
+          routes silently stop working - the single most common way a first gateway fails to route
+          anything. Nothing else in this project is reactive, and nothing else needs to be: the
+          gateway holds thousands of connections that are mostly waiting on somebody else, which is
+          the one workload where an event loop earns its complexity.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+        </dependency>
+
+        <!--
+          Turns `uri: lb://catalog-service` into a real address. Without it the route table parses,
+          the gateway starts, and every request through an lb:// route fails with
+          "Unable to find instance for catalog-service" - which reads like a registration problem and
+          is actually a missing load-balancer client.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
+        <!--
+          Rate limiting at the edge (Step 6). RequestRateLimiter's default implementation is a Redis
+          Lua token bucket, and it has to be the REACTIVE Redis starter: the blocking one would park
+          an event-loop thread on every request, which is the one thing a reactive gateway must not
+          do.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+          DISTRIBUTED TRACING (Step 13). Two artifacts, and neither is optional on its own:
+          the bridge makes Micrometer's Observation API produce Brave spans, and the reporter is what
+          actually ships them to Zipkin. With only the bridge, every service traces perfectly and
+          nothing ever leaves the process.
+
+          Brave rather than OpenTelemetry, and the reasoning is in docs/decisions.md D18: this is the
+          stack Spring Boot documents first, it is one small container to run, and the propagation
+          format on the wire is W3C `traceparent` either way - so the exporter is swappable without
+          touching a line of application code.
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-reporter-brave</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- For @Validated on JwtProperties: a bad signing key must fail at startup, not on the
+             first authenticated request to reach the public edge. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+
+        <!--
+          Verification only. The gateway holds the signing key to CHECK signatures and has no way to
+          issue a token: no users table, no password encoder, no login endpoint. A component that can
+          mint credentials is a component that has to be audited, and this one sits on the public
+          edge.
+        -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

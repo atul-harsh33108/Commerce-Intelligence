@@ -1,0 +1,106 @@
+# order-service, all profiles.
+
+server:
+  port: 8084
+
+spring:
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  outbox:
+    # How often the relay looks for unpublished events. The floor on end-to-end saga latency, and a
+    # deliberate trade: shorter means a busier database, longer means a slower checkout. 500 ms is
+    # imperceptible next to the network and LLM latencies elsewhere in this system.
+    poll-interval-ms: 500
+    # How many rows one relay pass claims. Bounded so a backlog drains steadily rather than in one
+    # transaction that holds locks for a second.
+    batch-size: 100
+  saga:
+    # How long a PENDING order may sit before the recovery job assumes its saga died and compensates.
+    # Longer than any legitimate round trip, shorter than a customer's patience.
+    timeout: PT2M
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      catalog:
+        # COUNT_BASED over the last 20 calls. The alternative, TIME_BASED, is the better choice for a
+        # dependency with steady traffic; this one is called once per checkout and can sit idle for
+        # minutes, where a time window would decide on two samples.
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        # Do not judge before there is something to judge. Without this the first failed call is a
+        # 100% failure rate and the breaker opens on one blip.
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        # Slow calls count as failures. A dependency answering in 4s is not "up" from a caller's
+        # point of view - it is a thread pool being consumed - and a breaker that only counts errors
+        # never notices the failure mode that actually takes systems down.
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 60
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+      inventory:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 60
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        # OUT OF STOCK IS NOT A FAILURE.
+        #
+        # Without this, enough customers ordering one sold-out product would trip the breaker and
+        # block reservations for every OTHER product - a business outcome taking down an unrelated
+        # code path. `ignore-exceptions` is the difference between a circuit breaker that protects
+        # the system and one that amplifies a bad afternoon into an outage.
+        ignore-exceptions:
+          - com.ecommerce.order.exception.OutOfStockException
+
+  retry:
+    instances:
+      catalog:
+        max-attempts: 3
+        wait-duration: 200ms
+        # Exponential, and jittered. Without randomisation every caller that failed at the same
+        # instant retries at the same instant - a thundering herd that keeps a recovering service
+        # down. The jitter is what turns a synchronised spike into a spread.
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+
+      inventory:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        # Retrying "there are three left" produces the same answer three times more slowly.
+        ignore-exceptions:
+          - com.ecommerce.order.exception.OutOfStockException
+
+      inventoryCompensation:
+        # More attempts and more patience than the request path, because the constraint is different:
+        # nobody is waiting, and failing to release stock leaves it reserved for an order that no
+        # longer exists.
+        max-attempts: 5
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      # Puts every breaker's state into /actuator/health, which is how "why is checkout returning
+      # 503" is answered in one request instead of by reading logs.
+      enabled: true

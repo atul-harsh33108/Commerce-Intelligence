@@ -1,0 +1,43 @@
+# Local development, shared by every service.
+
+spring:
+  jpa:
+    hibernate:
+      # Flyway owns the schema. Hibernate's job is to check that the entities still match it and to
+      # refuse to start if they do not - never to change it. `update` is the setting that quietly
+      # adds a column on one developer's machine and nowhere else.
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
+app:
+  jwt:
+    # DEV ONLY, and deliberately in plaintext here rather than encrypted.
+    #
+    # The capstone used the config server's `{cipher}` mechanism for this, which is worth
+    # understanding and is worth being honest about: it keeps a credential out of a Git history that
+    # everyone with read access can browse forever, and it hands the plaintext to anything that can
+    # reach the config server. It protects the repository, not the wire.
+    #
+    # Here the value is a throwaway that signs nothing outside a laptop, so encrypting it would
+    # demonstrate the mechanism while protecting nothing. Production does not use `{cipher}` at all -
+    # see application-prod.yml, where the value is a ${JWT_SECRET} placeholder the config server
+    # passes through unresolved and the deployment supplies from a Kubernetes Secret.
+    secret: dev-only-signing-key-not-used-anywhere-else-0123456789
+
+logging:
+  level:
+    com.ecommerce: DEBUG

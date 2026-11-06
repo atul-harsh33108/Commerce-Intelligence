@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ecommerce</groupId>
+        <artifactId>ecommerce-platform</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>config-server</artifactId>
+    <name>config-server</name>
+    <description>Serves every other service its configuration; owns no business data</description>
+
+    <dependencies>
+        <!--
+          Brings spring-boot-starter-web with it. Note what is NOT here: no JPA, no database driver,
+          no security starter, no Lombok. This service has no domain, no rows and no users - it reads
+          files and returns JSON. Adding a database to it would give the platform a new single point
+          of failure in exchange for nothing.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-config-server</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+          DISTRIBUTED TRACING (Step 13). Two artifacts, and neither is optional on its own:
+          the bridge makes Micrometer's Observation API produce Brave spans, and the reporter is what
+          actually ships them to Zipkin. With only the bridge, every service traces perfectly and
+          nothing ever leaves the process.
+
+          Brave rather than OpenTelemetry, and the reasoning is in docs/decisions.md D18: this is the
+          stack Spring Boot documents first, it is one small container to run, and the propagation
+          format on the wire is W3C `traceparent` either way - so the exporter is swappable without
+          touching a line of application code.
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-reporter-brave</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+          Supplies the TextEncryptor behind /encrypt and /decrypt, and the ability to serve a
+          `{cipher}...` value decrypted. Without it the config server starts happily, answers
+          /encrypt with 404, and serves `{cipher}...` to clients verbatim - a service that then fails
+          on a signing key that is a literal string beginning with "{cipher}".
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-rsa</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

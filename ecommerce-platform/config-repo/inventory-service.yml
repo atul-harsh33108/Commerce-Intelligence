@@ -1,0 +1,20 @@
+# inventory-service, all profiles.
+
+server:
+  port: 8083
+
+spring:
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  outbox:
+    poll-interval-ms: 500
+    batch-size: 100
+  kafka:
+    groups:
+      # The consumer group id, and it is the SERVICE name rather than a topic name. Two services
+      # reading the same topic must be in different groups or they split the partitions between them
+      # and each sees half the events - the single most confusing Kafka misconfiguration, because
+      # nothing errors and both services look like they are working.
+      inventory: inventory-service

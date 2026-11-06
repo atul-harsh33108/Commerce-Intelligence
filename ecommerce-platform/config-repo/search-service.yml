@@ -1,0 +1,19 @@
+# search-service, all profiles.
+
+server:
+  port: 8086
+
+spring:
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    # Short, because search is the one thing that must fail fast. A slow search box is worse than an
+    # absent one: the user waits, then gets nothing. The GlobalExceptionHandler turns a timeout into
+    # a 503 with Retry-After so a frontend can hide the box rather than hang.
+    connection-timeout: 2s
+    socket-timeout: 5s
+
+app:
+  search:
+    # How many category buckets a facet response carries. 25 of 71, because a sidebar showing all 71
+    # is not a filter, it is a second catalogue.
+    facet-size: 25

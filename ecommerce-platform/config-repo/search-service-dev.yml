@@ -1,0 +1,5 @@
+# search-service, local development.
+#
+# NO DATASOURCE BLOCK, and its absence is the point: this service owns no database. Every other
+# service on the platform has one; a read model rebuildable from a replay must not, or it acquires
+# state nobody can reconstruct.

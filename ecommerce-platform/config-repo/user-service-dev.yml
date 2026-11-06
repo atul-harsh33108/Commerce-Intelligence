@@ -1,0 +1,14 @@
+# user-service, local development. Owns `userdb` and has credentials for no other.
+#
+# That last clause is database-per-service enforced rather than promised: these credentials work
+# against exactly one database, so a developer who writes a join across two services' tables finds
+# out at once instead of at review.
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/userdb}
+    username: userdb
+    password: userdb
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 3000

@@ -1,0 +1,252 @@
+# Shared by EVERY service, in every profile.
+#
+# Config Server resolves a request for {application}/{profile} into an ordered list of property
+# sources. The order is NOT "most specific service file first" - profile beats specificity:
+#
+#   order-service-dev.yml   >   application-dev.yml   >   order-service.yml   >   application.yml
+#
+# Read the middle two again. A platform-wide *profile* file outranks a *service-specific* one, so a
+# value put in `application-dev.yml` silently overrides the same key in `order-service.yml`, and the
+# service file looks ignored. The practical rule that follows: if a service needs to override
+# something, override it at the same profile level or lower.
+
+spring:
+  jpa:
+    # Off everywhere, deliberately. Open-in-view keeps a database connection held for the whole
+    # request so that a lazily-loaded association still works while the JSON is being written - which
+    # hides N+1 queries behind the view layer instead of failing where the query belongs.
+    open-in-view: false
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            # How long a caller is willing to be blocked is a promise about this platform, not a
+            # property of a developer's laptop - so it is stated once, unqualified by profile.
+            # Feign's own defaults are effectively "wait forever", which is how one slow service
+            # takes down every caller of it.
+            connect-timeout: 2000    # ms to establish a TCP connection
+            read-timeout: 3000       # ms to wait for a response once connected
+            logger-level: basic
+
+  kafka:
+    # Platform-wide, for the same reason the JWT signing key is: a producer and its consumers have to
+    # agree on the broker and on the topic name, or nothing works and nothing says why. A consumer
+    # subscribed to a topic that no one publishes to is simply silent.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # StringSerializer, NOT JsonSerializer, and this one was found by running the saga.
+      #
+      # Since Step 5 nothing on this platform publishes a Java object. Every producer writes its
+      # event to an outbox row, where it is ALREADY serialised JSON, and the relay sends that string.
+      # With JsonSerializer the string was serialised a second time, so the broker received
+      #
+      #     "\"{\\\"orderKey\\\": ...}\""
+      #
+      # - a JSON string containing JSON. The consumer's message converter then failed to bind it to
+      # the event record, retried three times, and tried to dead-letter it. The visible symptom was a
+      # missing DLT topic; the actual cause was two layers up, and the payload in the log was the
+      # only clue (note the escaped quotes).
+      #
+      # The general rule: decide ONCE where serialisation happens. Here it is the outbox writer,
+      # because that is where the payload has to become durable bytes anyway.
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # `acks: all` - the leader answers only once every in-sync replica has the record. The default
+      # (`acks: 1`) means the leader alone has it, so a leader failing before replication loses an
+      # acknowledged write. Locally there is one broker and this changes nothing; it is here so the
+      # setting is a decision rather than an omission when a real cluster runs three.
+      acks: all
+
+      # Retries plus idempotence. Retrying alone is how one network hiccup becomes two copies of the
+      # same event: the broker wrote the record and the acknowledgement was lost, so the producer
+      # sends it again. `enable.idempotence` gives each producer a sequence number the broker
+      # deduplicates against, which makes a retry safe *within one producer session*.
+      #
+      # It is not exactly-once, and the gap is exactly what the outbox pattern (Step 5) closes: a
+      # process that dies after committing an order and before publishing sends nothing at all.
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+
+        # No `__TypeId__` header. JsonSerializer writes the producer's fully-qualified class name
+        # into one by default, and a JsonDeserializer downstream obeys it - so order-service would be
+        # instructing search-service to instantiate `com.ecommerce.order.event.OrderPlaced`, a class
+        # that does not exist there and must not (D2). Consumers decide how to read the bytes; a
+        # producer publishes facts, not Java types.
+        spring.json.add.type.headers: false
+
+    template:
+      # WITHOUT THESE TWO SETTINGS THE TRACE STOPS AT THE BROKER, and a saga is the one thing on this
+      # platform whose story is entirely made of Kafka hops. Spring Kafka injects `traceparent` into
+      # message headers on send, and reads it back out on receive, only when observation is switched
+      # on - off by default, because it adds a span to every message.
+      #
+      # The failure mode of leaving these off is not "no tracing". It is four disconnected
+      # single-service traces, each of which looks perfectly healthy on its own.
+      observation-enabled: true
+
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Deliberately StringDeserializer, not JsonDeserializer. The JSON is turned into an object by a
+      # message converter, driven by the @KafkaListener method's own parameter type. That is what
+      # lets one service consume two topics carrying two event types.
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+      # A new consumer group reads the topic from the beginning rather than from "now". `latest` is
+      # the default and it silently loses every event published before a consumer first started.
+      auto-offset-reset: earliest
+
+      # Offsets are committed by the container after the listener returns, not on a timer by the
+      # client. Auto-commit acknowledges messages that have been *fetched*, so a crash mid-processing
+      # skips them: at-most-once, silently. This makes delivery at-least-once instead, which is a
+      # redelivery problem (solvable, with consumer-side idempotency) rather than a data-loss problem
+      # (not solvable).
+      enable-auto-commit: false
+
+    listener:
+      observation-enabled: true
+      ack-mode: RECORD
+
+server:
+  error:
+    # A stack trace in an error response tells an attacker the framework, the version and the package
+    # layout. It belongs in the log, where it already is.
+    include-stacktrace: never
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    # 10 seconds rather than the 30-second default. The registry is the thing that makes a killed
+    # instance stop receiving traffic, and 30 s of routing to a dead port is 30 s of 500s.
+    registry-fetch-interval-seconds: 10
+  instance:
+    # Register by IP, not by hostname. On a laptop the hostname resolves to something the other
+    # services cannot reach as often as not, and in a container it is the container id - which is
+    # resolvable only from inside Docker's own DNS and not from the host. The failure is a registry
+    # full of correct-looking entries that nothing can connect to.
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+app:
+  jwt:
+    # These describe the *token format*, and every service on the platform has to agree on it or
+    # nothing verifies. That is the definition of platform-wide configuration.
+    expiration-minutes: 60
+    issuer: ecommerce
+
+  kafka:
+    topics:
+      # Named after the fact, not after the service that happens to publish it today:
+      # `order.placed` rather than `order-service-events`. A topic outlives the code that writes it.
+      order-placed: ecommerce.order.placed
+      inventory-reserved: ecommerce.inventory.reserved
+      inventory-failed: ecommerce.inventory.failed
+      payment-completed: ecommerce.payment.completed
+      payment-failed: ecommerce.payment.failed
+      order-confirmed: ecommerce.order.confirmed
+      order-cancelled: ecommerce.order.cancelled
+      product-updated: ecommerce.product.updated
+    groups:
+      # THE CONSUMER GROUP ID, and it is the SERVICE name rather than a topic name.
+      #
+      # Two services reading the same topic must be in DIFFERENT groups, or Kafka splits the
+      # partitions between them and each sees roughly half the events. Nothing errors and both
+      # services look like they are working - which makes it the most confusing Kafka
+      # misconfiguration there is. Naming the group after the service makes the rule structural.
+      inventory: inventory-service
+      payment: payment-service
+      order: order-service
+      search: search-service
+
+management:
+  # --- DISTRIBUTED TRACING (Step 13) ---------------------------------------------------------
+  tracing:
+    sampling:
+      # 1.0 - every request traced. Correct here and WRONG in production, so it is worth being
+      # explicit about which is which. On this laptop the traffic is a smoke test and a browser, and
+      # a sampled-out trace is a debugging session that produces nothing. In production the usual
+      # figure is 0.01-0.1 with tail-based sampling in the collector, because the interesting traces
+      # are the slow and the failed ones and head-based sampling cannot know that yet.
+      probability: 1.0
+    propagation:
+      # W3C `traceparent`, not Brave's own B3 headers. B3 works fine between services that all use
+      # Brave - which is exactly the assumption that breaks at the first component somebody else
+      # wrote. `traceparent` is the standard every current tracer speaks, so choosing it costs
+      # nothing today and is what makes the OTel/X-Ray swap in docs/decisions.md D18 a configuration
+      # change rather than a rewrite.
+      type: w3c
+
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+  endpoints:
+    web:
+      exposure:
+        # `refresh` re-fetches from this server and rebinds the beans that can be rebound; `env` is
+        # how you prove it worked. Both are internal endpoints - no gateway route reaches
+        # /actuator/**, and each service's own filter chain requires ADMIN for everything except
+        # health and prometheus.
+        include: health,info,refresh,env,loggers,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      # Splits /actuator/health into two more useful questions, and Kubernetes probes depend on the
+      # distinction absolutely:
+      #
+      #   /actuator/health/liveness    is this process broken beyond recovery?   -> restart it
+      #   /actuator/health/readiness   can it serve traffic right now?           -> route to it
+      #
+      # Pointing a livenessProbe at plain /actuator/health is the classic mistake: that endpoint
+      # aggregates the datasource, so a database outage makes every replica "unhealthy" and
+      # Kubernetes restarts all of them - repeatedly, for a problem no restart can fix.
+      probes:
+        enabled: true
+
+  metrics:
+    tags:
+      # Every metric this process publishes gets `application=<name>`. Without it,
+      # `http_server_requests_seconds_count` from eight services is one undifferentiated series and
+      # "which service is erroring" cannot be asked.
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        # `percentiles:` would have each process compute its own p99 and publish the answer. Those
+        # numbers CANNOT BE AGGREGATED: the p99 of three replicas is not the mean, the max, or any
+        # function of their three p99s. Cumulative bucket counts add up across replicas, so
+        # Prometheus computes a true platform-wide p99 with histogram_quantile.
+        http.server.requests: true
+      slo:
+        http.server.requests: 10ms,25ms,50ms,100ms,250ms,500ms,1s,3s,5s
+
+resilience4j:
+  # Aspect ordering is platform policy, so it is stated once. The per-instance thresholds are not -
+  # those live with the service that owns the dependency being guarded.
+  #
+  # Resilience4j nests Retry OUTSIDE CircuitBreaker by default. Two things go wrong with that: one
+  # retried call records three separate failures against the breaker, and - worse - when the breaker
+  # is open its refusal travels out to Retry, which retries being told no through the full backoff.
+  #
+  # Spring's Ordered convention is that a LOWER number runs first and therefore sits further OUT.
+  # CircuitBreaker 1, Retry 2 gives CircuitBreaker(Retry(call)): three attempts count as one failure,
+  # and an open circuit refuses in microseconds with no retry in the path.
+  circuitbreaker:
+    circuit-breaker-aspect-order: 1
+  retry:
+    retry-aspect-order: 2
+
+logging:
+  pattern:
+    # Trace and span id in every log line. This is what makes tracing useful at 3am rather than merely
+    # impressive in a demo: copy the trace id out of a log line, paste it into Zipkin, and read the
+    # other eight services' view of the same request.
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  include-application-name: false

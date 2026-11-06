@@ -1,0 +1,30 @@
+# Production, shared by every service.
+#
+# The difference from `dev` is not "the same values with different numbers" - it is WHERE the values
+# come from. Every credential here is a `${ENV_VAR}` placeholder with no default, which the config
+# server passes through unresolved: it never sees the secret, so a compromised config server does not
+# leak one. Kubernetes injects them from a Secret; docker-compose from the environment.
+#
+# A placeholder with no default is also a fail-fast: a service started without JWT_SECRET does not
+# come up on a blank key, it refuses to start and says which property was missing.
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+
+logging:
+  level:
+    com.ecommerce: INFO
+    org.hibernate.SQL: WARN

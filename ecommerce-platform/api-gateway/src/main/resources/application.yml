@@ -1,0 +1,42 @@
+# api-gateway's entire local configuration.
+#
+# What ships in the jar is the bootstrap paradox and nothing else - a service cannot fetch its
+# configuration until it knows its own name and where the config server is. Its port, its routes and
+# everything it routes to come from the config server.
+#
+# Every service on this platform carries this block verbatim, which is the right kind of duplication:
+# it is the only configuration that cannot come from the config server, so a copy per service is the
+# floor, not a smell.
+
+spring:
+  application:
+    # The `{application}` in the config server's `/{application}/{profile}` lookup. Misspell it and
+    # this service silently receives only the shared `application.yml` - no port, no routes - then
+    # fails on first use rather than at startup.
+    name: api-gateway
+  profiles:
+    default: dev
+  cloud:
+    config:
+      # Refuse to start rather than start wrong. A service that falls back to bundled defaults when
+      # the config server is unreachable comes up holding last release's signing key and reports
+      # itself healthy; one that will not start is merely broken, and loudly.
+      fail-fast: true
+      retry:
+        # Fail-fast is not fail-instantly: on a cold start the config server may be seconds behind.
+        max-attempts: 6
+        initial-interval: 1000
+        multiplier: 1.5
+        max-interval: 8000
+
+---
+# Skipped when the `test` profile is active. A test that reaches out to a config server is not
+# testing this service: it fails whenever a server on somebody's laptop is down, and the suite could
+# not run in CI without standing up a second process.
+spring:
+  config:
+    activate:
+      on-profile: "!test"
+    # NOT `optional:`. An optional import would let this service start with no routes and no signing
+    # key, then fail somewhere far from the cause.
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8888}

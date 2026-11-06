@@ -1,0 +1,22 @@
+{
+  "index": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "analysis": {
+    "char_filter": {
+      "underscore_to_space": {
+        "type": "mapping",
+        "mappings": ["_ => \\u0020"]
+      }
+    },
+    "analyzer": {
+      "product_analyzer": {
+        "type": "custom",
+        "char_filter": ["underscore_to_space"],
+        "tokenizer": "standard",
+        "filter": ["lowercase", "asciifolding"]
+      }
+    }
+  }
+}

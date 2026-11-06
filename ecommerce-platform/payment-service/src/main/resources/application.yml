@@ -1,0 +1,29 @@
+# All that payment-service carries in its jar.
+#
+# Everything else - the datasource, the port, the signing key, the topic names, the log levels - is
+# served by the config server. What cannot move is the bootstrap paradox: a service cannot fetch its
+# configuration until it knows its own name and the address of the server holding it.
+#
+# Every service carries this block verbatim, which is the right kind of duplication: it is the only
+# configuration that cannot come from the config server, so a copy per service is the floor.
+
+spring:
+  application:
+    name: payment-service
+  profiles:
+    default: dev
+  cloud:
+    config:
+      fail-fast: true
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        multiplier: 1.5
+        max-interval: 8000
+
+---
+spring:
+  config:
+    activate:
+      on-profile: "!test"
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8888}

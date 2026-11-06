@@ -1,0 +1,27 @@
+# api-gateway, local development.
+#
+# WHAT THIS FILE MUST NOT CONTAIN, learned the hard way in Step 1.
+#
+# It originally re-declared the `analytics-agent` route here to give it a longer timeout in
+# development. Spring Cloud Config serves this file at a HIGHER precedence than `api-gateway.yml`
+# (profile beats specificity), and **Spring does not merge lists across property sources** - the
+# highest-priority source that contains any entry for `...routes[*]` supplies the whole list.
+#
+# The result: the gateway's route table became exactly one route, the analytics one, and every
+# `/api/**` request returned 404 from the gateway's default handler. Nothing warned. It looked like a
+# Eureka registration problem, because the services were the thing that had just changed.
+#
+# The rule that follows, and it applies to every indexed property, not just routes: **a list belongs
+# in exactly one file.** Per-environment differences go in scalars that the list interpolates
+# (`${app.services.agent.url}`), or in `metadata:` on the route itself.
+
+app:
+  services:
+    # The one address the gateway still holds. Everything else is `lb://` and resolved through
+    # Eureka; the agent is a Python process that does not register.
+    #
+    # `${VAR:default}` - overridable, with the laptop's address as the fallback. The default keeps
+    # `../mvnw spring-boot:run` working with no environment set at all, and docker-compose supplies
+    # AGENT_URL=http://analytics-agent:8000 because inside a container `localhost` is the container.
+    agent:
+      url: ${AGENT_URL:http://localhost:8000}

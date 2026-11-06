@@ -1,0 +1,66 @@
+# The profile every test runs under.
+#
+# No datasource block: Testcontainers supplies one at runtime through @ServiceConnection, and
+# hard-coding a URL here is exactly the coupling to a hand-started database that Testcontainers
+# removes.
+#
+# Two separate mechanisms keep the config server out of the tests, and BOTH are required. The
+# `on-profile: "!test"` guard in the main application.yml stops the *fetch* - config-data imports
+# resolve in an early phase, before this file is visible, so disabling the client here could not have
+# prevented it. The flag below stops the *check*: spring-cloud-starter-config refuses to start a
+# context that has the starter on the classpath and no `spring.config.import`. That check earns its
+# keep in production, where what it catches is a service quietly running on bundled defaults.
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      # Eureka off. A test that registers with a registry leaves an entry behind pointing at a JVM
+      # that has exited, and the gateway then routes real traffic to it.
+      enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    # db/migration only. Any seed data is deliberately absent: a test that depends on demo rows
+    # breaks the moment somebody edits the seed file, and "which rows exist" should be the test's own
+    # decision.
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+app:
+  jwt:
+    # Test-only, and irrelevant beyond satisfying the length constraint - nothing signed here
+    # outlives the test JVM.
+    secret: test-only-signing-key-not-used-anywhere-else-0123456789
+    expiration-minutes: 60
+    issuer: ecommerce
+  catalog:
+    cache-ttl: PT10M
+  kafka:
+    topics:
+      # Step 7 put this in config-repo/catalog-service.yml, which the tests deliberately never read -
+      # `spring.cloud.config.enabled: false` above is the whole point of this file. So a property the
+      # running service resolves fine was unresolvable here, and every test in this module failed to
+      # load its context.
+      #
+      # It went unnoticed from Step 7 to Step 12 because every build in between was `-DskipTests`,
+      # and it was GitHub Actions that finally said so. The value is repeated rather than defaulted
+      # in the @Value: a default would let the real service start with a topic name nobody chose,
+      # which is the failure this property exists to prevent.
+      product-updated: ecommerce.product.updated
+
+logging:
+  level:
+    org.springframework.web: WARN
+    org.hibernate: WARN
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

@@ -1,0 +1,20 @@
+# catalog-service, local development. Owns `catalogdb` and has credentials for no other.
+#
+# That last clause is the point of database-per-service and it is enforced here rather than promised:
+# these credentials work against exactly one database, so a developer who writes a join across two
+# services' tables finds out at once instead of at review.
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/catalogdb}
+    username: catalogdb
+    password: catalogdb
+    hikari:
+      # 10 rather than Hikari's default of 10 - stated so it is a decision. The rule of thumb is
+      # ((core_count * 2) + effective_spindle_count), and a pool larger than the database can serve
+      # concurrently makes queries queue inside Postgres instead of inside the application, where
+      # they are invisible.
+      maximum-pool-size: 10
+      # Fail a checkout attempt after 3s rather than blocking a request thread indefinitely. Under
+      # pool exhaustion this converts a hang into a 500, which at least appears in the metrics.
+      connection-timeout: 3000

@@ -1,0 +1,25 @@
+# catalog-service, all profiles.
+
+server:
+  port: 8082
+
+spring:
+  flyway:
+    # db/migration only, here. The Olist load is NOT a Flyway migration - see docs/decisions.md D14
+    # and scripts/load_olist.py. A 32K-row insert inside a schema migration means the schema version
+    # and the data version are the same number, so re-loading data requires faking a migration
+    # checksum, and a service that starts before the data is loaded is "un-migrated" forever.
+    locations: classpath:db/migration
+
+app:
+  outbox:
+    # Higher than the saga's 100. A reindex queues 32,951 rows at once and the only thing waiting is
+    # a search index, so draining fast matters more than keeping the batch transaction short.
+    batch-size: 500
+    poll-interval-ms: 500
+  catalog:
+    # How long a cached product may be stale (Step 6). Bounded rather than infinite even though
+    # writes evict explicitly: an evict is a Redis DEL that can be lost in a partition, and an
+    # in-flight read on another node can repopulate with a pre-write value. The TTL is what makes
+    # that self-correcting instead of permanent.
+    cache-ttl: PT10M

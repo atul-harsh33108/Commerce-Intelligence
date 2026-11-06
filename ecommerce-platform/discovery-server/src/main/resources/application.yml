@@ -1,0 +1,57 @@
+# The registry's own configuration.
+#
+# Deliberately NOT fetched from the config server, unlike every other service. Two fixed addresses on
+# this platform - the config server and this one - and each is fixed for a different reason:
+#
+#   config-server    every service needs it before it has any beans, so it cannot be discovered
+#   discovery-server it is the thing that answers "where is X", so bootstrapping it through the
+#                    config server would make the two mutually dependent at startup for no gain
+#
+# Everything else on the platform has exactly one hard-coded address (the config server's) and learns
+# the rest. See docs/decisions.md D4.
+
+spring:
+  application:
+    name: discovery-server
+
+server:
+  port: 8761
+
+eureka:
+  instance:
+    hostname: ${EUREKA_HOSTNAME:localhost}
+  client:
+    # A standalone registry does not register with, or fetch from, itself. Both default to true
+    # because the common production topology is a peer-to-peer cluster of registries that replicate
+    # to each other; with one node those two flags make it try to talk to itself and log a
+    # connection refused every 30 seconds until it gives up.
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+
+  server:
+    # OFF, for local development only, and this is the setting most worth understanding.
+    #
+    # Self-preservation stops Eureka evicting instances when the rate of received heartbeats drops
+    # below an expected threshold, on the theory that a sudden silence from many clients is more
+    # likely a network partition than 20 simultaneous crashes. In production that is correct and
+    # should stay on: evicting a healthy fleet because the registry lost its network is a
+    # self-inflicted outage.
+    #
+    # On a laptop it is purely obstructive. Ctrl-C a service and it stays in the registry for
+    # minutes, so the gateway keeps routing to a dead port and the failure looks like a bug in the
+    # gateway. Here a silent instance really is a stopped one.
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
