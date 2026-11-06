@@ -1,0 +1,315 @@
+# The evaluation set: a plain-English question, and the SQL that answers it correctly.
+#
+# ================================================================================================
+# WHAT THIS IS, AND WHAT IT IS NOT
+# ================================================================================================
+#
+# This is a DOMAIN evaluation over this project's own warehouse, not a public benchmark. That
+# distinction matters and is argued in docs/evaluation.md rather than glossed:
+#
+#   what it measures    the system that is actually deployed - this schema, this metadata, these
+#                       71 real categories, the real Olist distributions - end to end through the
+#                       gateway, exactly as a user would hit it
+#   what it cannot do   settle "is this agent good" against anyone else's. Spider and BIRD exist so
+#                       that number is comparable, and a home-made set is not comparable by
+#                       construction. docs/evaluation.md says what running Spider here would take.
+#
+# The METRIC is Spider's, even though the questions are not: EXECUTION ACCURACY - run the gold SQL,
+# run the generated SQL, compare the RESULT SETS. Not string similarity, which punishes a correct
+# query written differently; not "does the expected number appear somewhere", which passes a query
+# returning the right value in the wrong shape.
+#
+# ================================================================================================
+# HOW THE GOLD SQL WAS WRITTEN
+# ================================================================================================
+#
+# By hand against the schema, then executed to confirm it returns something sensible. It is the
+# reference, so it has to be right - a wrong gold answer turns a correct agent into a failure and is
+# the easiest way to produce a meaningless accuracy number.
+#
+# `ordered: true` means the question asks for a ranking, so row ORDER is part of the answer. Without
+# it, comparison is order-insensitive: the same rows in a different sequence is the same answer.
+#
+# TWO QUESTIONS WERE REWORDED AFTER THE FIRST RUN, and it is worth being explicit that this is a fix
+# to the benchmark rather than tuning it. "Which single month had the highest revenue?" was scored
+# against gold SQL selecting BOTH the month and the revenue; the agent answered with the month
+# alone, which is a correct answer to the question as asked. The gold was answering a question I had
+# not written. Both now say "...and how much was it?", so the question and its gold agree.
+#
+# The line not crossed: no question was changed because the model got it wrong. `count-products-sold`
+# stayed exactly as it was and stays a failure.
+
+questions:
+
+  # -- 1. Simple aggregation ------------------------------------------------------------------
+  - id: agg-total-revenue
+    category: simple-aggregation
+    question: What is the total revenue across all orders?
+    sql: SELECT ROUND(SUM(line_revenue), 2) AS total_revenue FROM fact_order_items
+
+  - id: agg-order-count
+    category: simple-aggregation
+    question: How many orders are there in total?
+    sql: SELECT COUNT(DISTINCT order_key) AS order_count FROM fact_order_items
+
+  - id: agg-units-sold
+    category: simple-aggregation
+    question: How many units have been sold in total?
+    sql: SELECT SUM(quantity) AS units FROM fact_order_items
+
+  - id: agg-freight
+    category: simple-aggregation
+    question: What is the total freight cost we have charged?
+    sql: SELECT ROUND(SUM(freight_amount), 2) AS freight FROM fact_order_items
+
+  - id: agg-avg-delivery
+    category: simple-aggregation
+    question: What is the average delivery time in days?
+    sql: SELECT ROUND(AVG(delivery_days), 2) AS avg_days FROM fact_order_items WHERE delivery_days IS NOT NULL
+
+  # -- 2. Filtering ---------------------------------------------------------------------------
+  - id: filter-delivered-revenue
+    category: filtering
+    question: What is the total revenue from delivered orders only?
+    sql: SELECT ROUND(SUM(line_revenue), 2) AS revenue FROM fact_order_items WHERE order_status = 'DELIVERED'
+
+  - id: filter-2018-revenue
+    category: filtering
+    question: What was the total revenue in 2018?
+    sql: |
+      SELECT ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_date d ON d.date_id = f.date_id
+       WHERE d.year = 2018
+
+  - id: filter-cancelled-count
+    category: filtering
+    question: How many orders were cancelled?
+    sql: SELECT COUNT(DISTINCT order_key) AS cancelled FROM fact_order_items WHERE order_status = 'CANCELED'
+
+  - id: filter-sp-orders
+    category: filtering
+    question: How many orders came from customers in the state of Sao Paulo?
+    sql: |
+      SELECT COUNT(DISTINCT f.order_key) AS orders
+        FROM fact_order_items f
+        JOIN dim_customer c ON c.customer_id = f.customer_id
+       WHERE c.state = 'SP'
+
+  - id: filter-category-revenue
+    category: filtering
+    question: What is the total revenue for the health_beauty category?
+    sql: |
+      SELECT ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_product p ON p.product_id = f.product_id
+       WHERE p.category = 'health_beauty'
+
+  # -- 3. Group by and ranking ----------------------------------------------------------------
+  - id: rank-top5-categories
+    category: ranking
+    question: Which are the top 5 product categories by revenue?
+    ordered: true
+    sql: |
+      SELECT p.category, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_product p ON p.product_id = f.product_id
+       GROUP BY p.category
+       ORDER BY revenue DESC
+       LIMIT 5
+
+  - id: rank-top5-states
+    category: ranking
+    question: Which 5 states generate the most revenue?
+    ordered: true
+    sql: |
+      SELECT c.state, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_customer c ON c.customer_id = f.customer_id
+       GROUP BY c.state
+       ORDER BY revenue DESC
+       LIMIT 5
+
+  - id: rank-revenue-by-region
+    category: ranking
+    question: What is the total revenue for each Brazilian region?
+    sql: |
+      SELECT g.region, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_geography g ON g.geography_id = f.geography_id
+       GROUP BY g.region
+
+  - id: rank-orders-by-status
+    category: ranking
+    question: How many orders are there in each order status?
+    sql: SELECT order_status, COUNT(DISTINCT order_key) AS orders FROM fact_order_items GROUP BY order_status
+
+  - id: rank-bottom-categories
+    category: ranking
+    question: Which 3 product categories have the lowest total revenue?
+    ordered: true
+    sql: |
+      SELECT p.category, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_product p ON p.product_id = f.product_id
+       WHERE p.category IS NOT NULL
+       GROUP BY p.category
+       ORDER BY revenue ASC
+       LIMIT 3
+
+  # -- 4. Time series -------------------------------------------------------------------------
+  - id: time-monthly-2018
+    category: time-series
+    question: Show the monthly revenue for 2018.
+    sql: |
+      SELECT d.month_key, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_date d ON d.date_id = f.date_id
+       WHERE d.year = 2018
+       GROUP BY d.month_key
+
+  - id: time-revenue-by-year
+    category: time-series
+    question: What is the total revenue per year?
+    sql: |
+      SELECT d.year, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_date d ON d.date_id = f.date_id
+       GROUP BY d.year
+
+  - id: time-best-month
+    category: time-series
+    question: Which single month had the highest revenue, and how much was it?
+    ordered: true
+    sql: |
+      SELECT d.month_key, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_date d ON d.date_id = f.date_id
+       GROUP BY d.month_key
+       ORDER BY revenue DESC
+       LIMIT 1
+
+  - id: time-quarterly-2018
+    category: time-series
+    question: What was the revenue in each quarter of 2018?
+    sql: |
+      SELECT d.quarter, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_date d ON d.date_id = f.date_id
+       WHERE d.year = 2018
+       GROUP BY d.quarter
+
+  # -- 5. The traps the metadata exists to prevent --------------------------------------------
+  - id: trap-distinct-customers
+    category: trap
+    question: How many distinct customers do we have?
+    note: customer_key is one per ORDER; customer_unique_key is one per PERSON.
+    sql: SELECT COUNT(DISTINCT customer_unique_key) AS customers FROM dim_customer
+
+  - id: trap-late-rate
+    category: trap
+    question: What percentage of delivered order lines arrived after the estimated delivery date?
+    note: is_late IS NULL means not yet delivered, not on time. Counting NULL as on-time flatters it.
+    sql: |
+      SELECT ROUND(SUM(is_late) * 100.0 / COUNT(is_late), 2) AS pct_late
+        FROM fact_order_items
+       WHERE is_late IS NOT NULL
+
+  - id: trap-line-count
+    category: trap
+    question: How many order lines are there in total?
+    note: Lines, not orders - the fact table grain. COUNT(DISTINCT order_key) here would be wrong.
+    sql: SELECT COUNT(*) AS lines_count FROM fact_order_items
+
+  - id: trap-avg-order-value
+    category: trap
+    question: What is the average order value?
+    note: Per ORDER, not per line - the denominator is COUNT(DISTINCT order_key).
+    sql: |
+      SELECT ROUND(SUM(line_total) / COUNT(DISTINCT order_key), 2) AS aov
+        FROM fact_order_items
+
+  # -- 6. Multi-dimension joins ---------------------------------------------------------------
+  - id: join-category-by-region
+    category: multi-join
+    question: What is the revenue for the health_beauty category in the Southeast region?
+    sql: |
+      SELECT ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_product p   ON p.product_id   = f.product_id
+        JOIN dim_geography g ON g.geography_id = f.geography_id
+       WHERE p.category = 'health_beauty' AND g.region = 'Southeast'
+
+  - id: join-top-category-2017
+    category: multi-join
+    question: Which product category had the highest revenue in 2017, and how much was it?
+    ordered: true
+    sql: |
+      SELECT p.category, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_product p ON p.product_id = f.product_id
+        JOIN dim_date d    ON d.date_id    = f.date_id
+       WHERE d.year = 2017
+       GROUP BY p.category
+       ORDER BY revenue DESC
+       LIMIT 1
+
+  - id: join-delivered-region-2018
+    category: multi-join
+    question: What was the delivered revenue by region in 2018?
+    sql: |
+      SELECT g.region, ROUND(SUM(f.line_revenue), 2) AS revenue
+        FROM fact_order_items f
+        JOIN dim_geography g ON g.geography_id = f.geography_id
+        JOIN dim_date d      ON d.date_id      = f.date_id
+       WHERE d.year = 2018 AND f.order_status = 'DELIVERED'
+       GROUP BY g.region
+
+  - id: join-avg-delivery-by-region
+    category: multi-join
+    question: What is the average delivery time in days for each region?
+    sql: |
+      SELECT g.region, ROUND(AVG(f.delivery_days), 2) AS avg_days
+        FROM fact_order_items f
+        JOIN dim_geography g ON g.geography_id = f.geography_id
+       WHERE f.delivery_days IS NOT NULL
+       GROUP BY g.region
+
+  # -- 7. Ratios and derived measures ---------------------------------------------------------
+  - id: ratio-freight-share
+    category: ratio
+    question: What percentage of the total amount customers paid was freight?
+    sql: |
+      SELECT ROUND(SUM(freight_amount) * 100.0 / SUM(line_total), 2) AS freight_pct
+        FROM fact_order_items
+
+  - id: ratio-late-by-region
+    category: ratio
+    question: What is the late delivery rate for each region?
+    sql: |
+      SELECT g.region, ROUND(SUM(f.is_late) * 100.0 / COUNT(f.is_late), 2) AS pct_late
+        FROM fact_order_items f
+        JOIN dim_geography g ON g.geography_id = f.geography_id
+       WHERE f.is_late IS NOT NULL
+       GROUP BY g.region
+
+  - id: ratio-avg-unit-price
+    category: ratio
+    question: What is the average unit price across all order lines?
+    sql: SELECT ROUND(AVG(unit_price), 2) AS avg_price FROM fact_order_items
+
+  # -- 8. Counting distinct things ------------------------------------------------------------
+  - id: count-categories
+    category: counting
+    question: How many distinct product categories are there?
+    sql: SELECT COUNT(DISTINCT category) AS categories FROM dim_product WHERE category IS NOT NULL
+
+  - id: count-products-sold
+    category: counting
+    question: How many distinct products have actually been sold?
+    sql: SELECT COUNT(DISTINCT product_id) AS products FROM fact_order_items
+
+  - id: count-states
+    category: counting
+    question: How many different states have customers ordered from?
+    sql: SELECT COUNT(DISTINCT state) AS states FROM dim_customer WHERE state IS NOT NULL

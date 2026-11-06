@@ -1,0 +1,1139 @@
+{
+  "timestamp": "2026-08-19T15:57:29",
+  "tag": "after-fix",
+  "questions": 33,
+  "passed": 29,
+  "execution_accuracy_pct": 87.9,
+  "wall_seconds": 398.4,
+  "self_corrections_fired": 0,
+  "results": [
+    {
+      "id": "agg-total-revenue",
+      "category": "simple-aggregation",
+      "question": "What is the total revenue across all orders?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(line_revenue), 2) AS total_revenue FROM fact_order_items",
+      "gold_rows": [
+        {
+          "total_revenue": "13591687.34"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(line_revenue) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "SUM(line_revenue)": "13591687.34"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 8.22,
+      "error": null
+    },
+    {
+      "id": "agg-order-count",
+      "category": "simple-aggregation",
+      "question": "How many orders are there in total?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT order_key) AS order_count FROM fact_order_items",
+      "gold_rows": [
+        {
+          "order_count": 98668
+        }
+      ],
+      "predicted_sql": "SELECT COUNT(DISTINCT fact_order_items.order_key) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT fact_order_items.order_key)": 98668
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 12.93,
+      "error": null
+    },
+    {
+      "id": "agg-units-sold",
+      "category": "simple-aggregation",
+      "question": "How many units have been sold in total?",
+      "ordered": false,
+      "gold_sql": "SELECT SUM(quantity) AS units FROM fact_order_items",
+      "gold_rows": [
+        {
+          "units": "112654"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(fact_order_items.quantity) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "SUM(fact_order_items.quantity)": "112654"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 5.66,
+      "error": null
+    },
+    {
+      "id": "agg-freight",
+      "category": "simple-aggregation",
+      "question": "What is the total freight cost we have charged?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(freight_amount), 2) AS freight FROM fact_order_items",
+      "gold_rows": [
+        {
+          "freight": "2251939.54"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(fact_order_items.freight_amount) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "SUM(fact_order_items.freight_amount)": "2251939.54"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 11.44,
+      "error": null
+    },
+    {
+      "id": "agg-avg-delivery",
+      "category": "simple-aggregation",
+      "question": "What is the average delivery time in days?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(AVG(delivery_days), 2) AS avg_days FROM fact_order_items WHERE delivery_days IS NOT NULL",
+      "gold_rows": [
+        {
+          "avg_days": "12.41"
+        }
+      ],
+      "predicted_sql": "SELECT AVG(delivery_days) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "AVG(delivery_days)": "12.4110"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 22.17,
+      "error": null
+    },
+    {
+      "id": "filter-delivered-revenue",
+      "category": "filtering",
+      "question": "What is the total revenue from delivered orders only?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(line_revenue), 2) AS revenue FROM fact_order_items WHERE order_status = 'DELIVERED'",
+      "gold_rows": [
+        {
+          "revenue": "13221498.11"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(line_revenue) FROM fact_order_items WHERE order_status = 'DELIVERED'",
+      "predicted_rows": [
+        {
+          "SUM(line_revenue)": "13221498.11"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 6.98,
+      "error": null
+    },
+    {
+      "id": "filter-2018-revenue",
+      "category": "filtering",
+      "question": "What was the total revenue in 2018?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_date d ON d.date_id = f.date_id\n WHERE d.year = 2018",
+      "gold_rows": [
+        {
+          "revenue": "7386050.80"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(T1.line_revenue) FROM fact_order_items AS T1 JOIN dim_date AS T2 ON T1.date_id = T2.date_id WHERE T2.year = 2018",
+      "predicted_rows": [
+        {
+          "SUM(T1.line_revenue)": "7386050.80"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 13.87,
+      "error": null
+    },
+    {
+      "id": "filter-cancelled-count",
+      "category": "filtering",
+      "question": "How many orders were cancelled?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT order_key) AS cancelled FROM fact_order_items WHERE order_status = 'CANCELED'",
+      "gold_rows": [
+        {
+          "cancelled": 461
+        }
+      ],
+      "predicted_sql": "SELECT COUNT(DISTINCT order_key) FROM fact_order_items WHERE order_status = 'CANCELED'",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT order_key)": 461
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 7.38,
+      "error": null
+    },
+    {
+      "id": "filter-sp-orders",
+      "category": "filtering",
+      "question": "How many orders came from customers in the state of Sao Paulo?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT f.order_key) AS orders\n  FROM fact_order_items f\n  JOIN dim_customer c ON c.customer_id = f.customer_id\n WHERE c.state = 'SP'",
+      "gold_rows": [
+        {
+          "orders": 41375
+        }
+      ],
+      "predicted_sql": "SELECT\n  COUNT(DISTINCT fact_order_items.order_key)\nFROM fact_order_items\nINNER JOIN dim_geography\n  ON fact_order_items.geography_id = dim_geography.geography_id\nWHERE\n  dim_geography.state_name = 'Sao Paulo'",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT fact_order_items.order_key)": 41375
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 15.97,
+      "error": null
+    },
+    {
+      "id": "filter-category-revenue",
+      "category": "filtering",
+      "question": "What is the total revenue for the health_beauty category?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_product p ON p.product_id = f.product_id\n WHERE p.category = 'health_beauty'",
+      "gold_rows": [
+        {
+          "revenue": "1258681.34"
+        }
+      ],
+      "predicted_sql": "SELECT\n  SUM(T1.line_revenue)\nFROM fact_order_items AS T1\nINNER JOIN dim_product AS T2\n  ON T1.product_id = T2.product_id\nWHERE\n  T2.category = 'health_beauty'",
+      "predicted_rows": [
+        {
+          "SUM(T1.line_revenue)": "1258681.34"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 6.85,
+      "error": null
+    },
+    {
+      "id": "rank-top5-categories",
+      "category": "ranking",
+      "question": "Which are the top 5 product categories by revenue?",
+      "ordered": true,
+      "gold_sql": "SELECT p.category, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_product p ON p.product_id = f.product_id\n GROUP BY p.category\n ORDER BY revenue DESC\n LIMIT 5",
+      "gold_rows": [
+        {
+          "category": "health_beauty",
+          "revenue": "1258681.34"
+        },
+        {
+          "category": "watches_gifts",
+          "revenue": "1205005.68"
+        },
+        {
+          "category": "bed_bath_table",
+          "revenue": "1036988.68"
+        },
+        {
+          "category": "sports_leisure",
+          "revenue": "988048.97"
+        },
+        {
+          "category": "computers_accessories",
+          "revenue": "911954.32"
+        }
+      ],
+      "predicted_sql": "SELECT\n  dp.category,\n  SUM(foi.line_revenue) AS Revenue\nFROM fact_order_items AS foi\nJOIN dim_product AS dp\n  ON foi.product_id = dp.product_id\nGROUP BY\n  dp.category\nORDER BY\n  Revenue DESC\nLIMIT 5",
+      "predicted_rows": [
+        {
+          "category": "health_beauty",
+          "Revenue": "1258681.34"
+        },
+        {
+          "category": "watches_gifts",
+          "Revenue": "1205005.68"
+        },
+        {
+          "category": "bed_bath_table",
+          "Revenue": "1036988.68"
+        },
+        {
+          "category": "sports_leisure",
+          "Revenue": "988048.97"
+        },
+        {
+          "category": "computers_accessories",
+          "Revenue": "911954.32"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 9.32,
+      "error": null
+    },
+    {
+      "id": "rank-top5-states",
+      "category": "ranking",
+      "question": "Which 5 states generate the most revenue?",
+      "ordered": true,
+      "gold_sql": "SELECT c.state, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_customer c ON c.customer_id = f.customer_id\n GROUP BY c.state\n ORDER BY revenue DESC\n LIMIT 5",
+      "gold_rows": [
+        {
+          "state": "SP",
+          "revenue": "5202955.05"
+        },
+        {
+          "state": "RJ",
+          "revenue": "1824092.67"
+        },
+        {
+          "state": "MG",
+          "revenue": "1585308.03"
+        },
+        {
+          "state": "RS",
+          "revenue": "750304.02"
+        },
+        {
+          "state": "PR",
+          "revenue": "683083.76"
+        }
+      ],
+      "predicted_sql": "SELECT\n  T2.state_name,\n  SUM(T1.line_revenue) AS Revenue\nFROM fact_order_items AS T1\nINNER JOIN dim_geography AS T2\n  ON T1.geography_id = T2.geography_id\nGROUP BY\n  T2.state_name\nORDER BY\n  Revenue DESC\nLIMIT 5",
+      "predicted_rows": [
+        {
+          "state_name": "Sao Paulo",
+          "Revenue": "5202955.05"
+        },
+        {
+          "state_name": "Rio de Janeiro",
+          "Revenue": "1824092.67"
+        },
+        {
+          "state_name": "Minas Gerais",
+          "Revenue": "1585308.03"
+        },
+        {
+          "state_name": "Rio Grande do Sul",
+          "Revenue": "750304.02"
+        },
+        {
+          "state_name": "Parana",
+          "Revenue": "683083.76"
+        }
+      ],
+      "verdict": "FAIL",
+      "corrections": 0,
+      "seconds": 12.15,
+      "error": null
+    },
+    {
+      "id": "rank-revenue-by-region",
+      "category": "ranking",
+      "question": "What is the total revenue for each Brazilian region?",
+      "ordered": false,
+      "gold_sql": "SELECT g.region, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_geography g ON g.geography_id = f.geography_id\n GROUP BY g.region",
+      "gold_rows": [
+        {
+          "region": "North",
+          "revenue": "334353.71"
+        },
+        {
+          "region": "Northeast",
+          "revenue": "1545493.75"
+        },
+        {
+          "region": "Central-West",
+          "revenue": "870462.06"
+        },
+        {
+          "region": "Southeast",
+          "revenue": "8887393.06"
+        },
+        {
+          "region": "South",
+          "revenue": "1953941.12"
+        },
+        {
+          "region": "Unknown",
+          "revenue": "43.64"
+        }
+      ],
+      "predicted_sql": "SELECT\n  T2.region,\n  SUM(T1.line_revenue) AS total_revenue\nFROM fact_order_items AS T1\nINNER JOIN dim_geography AS T2\n  ON T1.geography_id = T2.geography_id\nGROUP BY\n  T2.region",
+      "predicted_rows": [
+        {
+          "region": "North",
+          "total_revenue": "334353.71"
+        },
+        {
+          "region": "Northeast",
+          "total_revenue": "1545493.75"
+        },
+        {
+          "region": "Central-West",
+          "total_revenue": "870462.06"
+        },
+        {
+          "region": "Southeast",
+          "total_revenue": "8887393.06"
+        },
+        {
+          "region": "South",
+          "total_revenue": "1953941.12"
+        },
+        {
+          "region": "Unknown",
+          "total_revenue": "43.64"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 8.94,
+      "error": null
+    },
+    {
+      "id": "rank-orders-by-status",
+      "category": "ranking",
+      "question": "How many orders are there in each order status?",
+      "ordered": false,
+      "gold_sql": "SELECT order_status, COUNT(DISTINCT order_key) AS orders FROM fact_order_items GROUP BY order_status",
+      "gold_rows": [
+        {
+          "order_status": "APPROVED",
+          "orders": 2
+        },
+        {
+          "order_status": "CANCELED",
+          "orders": 461
+        },
+        {
+          "order_status": "CONFIRMED",
+          "orders": 2
+        },
+        {
+          "order_status": "DELIVERED",
+          "orders": 96478
+        },
+        {
+          "order_status": "INVOICED",
+          "orders": 312
+        },
+        {
+          "order_status": "PROCESSING",
+          "orders": 301
+        },
+        {
+          "order_status": "SHIPPED",
+          "orders": 1106
+        },
+        {
+          "order_status": "UNAVAILABLE",
+          "orders": 6
+        }
+      ],
+      "predicted_sql": "SELECT\n  order_status,\n  COUNT(DISTINCT order_key) AS `Order Count`\nFROM fact_order_items\nGROUP BY\n  order_status",
+      "predicted_rows": [
+        {
+          "order_status": "APPROVED",
+          "Order Count": 2
+        },
+        {
+          "order_status": "CANCELED",
+          "Order Count": 461
+        },
+        {
+          "order_status": "CONFIRMED",
+          "Order Count": 2
+        },
+        {
+          "order_status": "DELIVERED",
+          "Order Count": 96478
+        },
+        {
+          "order_status": "INVOICED",
+          "Order Count": 312
+        },
+        {
+          "order_status": "PROCESSING",
+          "Order Count": 301
+        },
+        {
+          "order_status": "SHIPPED",
+          "Order Count": 1106
+        },
+        {
+          "order_status": "UNAVAILABLE",
+          "Order Count": 6
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 6.52,
+      "error": null
+    },
+    {
+      "id": "rank-bottom-categories",
+      "category": "ranking",
+      "question": "Which 3 product categories have the lowest total revenue?",
+      "ordered": true,
+      "gold_sql": "SELECT p.category, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_product p ON p.product_id = f.product_id\n WHERE p.category IS NOT NULL\n GROUP BY p.category\n ORDER BY revenue ASC\n LIMIT 3",
+      "gold_rows": [
+        {
+          "category": "security_and_services",
+          "revenue": "283.29"
+        },
+        {
+          "category": "fashion_childrens_clothes",
+          "revenue": "569.85"
+        },
+        {
+          "category": "cds_dvds_musicals",
+          "revenue": "730.00"
+        }
+      ],
+      "predicted_sql": "SELECT\n  dp.category,\n  SUM(foi.line_revenue) AS total_revenue\nFROM fact_order_items AS foi\nJOIN dim_product AS dp\n  ON foi.product_id = dp.product_id\nGROUP BY\n  dp.category\nORDER BY\n  total_revenue ASC\nLIMIT 3",
+      "predicted_rows": [
+        {
+          "category": "security_and_services",
+          "total_revenue": "283.29"
+        },
+        {
+          "category": "fashion_childrens_clothes",
+          "total_revenue": "569.85"
+        },
+        {
+          "category": "cds_dvds_musicals",
+          "total_revenue": "730.00"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 9.57,
+      "error": null
+    },
+    {
+      "id": "time-monthly-2018",
+      "category": "time-series",
+      "question": "Show the monthly revenue for 2018.",
+      "ordered": false,
+      "gold_sql": "SELECT d.month_key, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_date d ON d.date_id = f.date_id\n WHERE d.year = 2018\n GROUP BY d.month_key",
+      "gold_rows": [
+        {
+          "month_key": "2018-01",
+          "revenue": "950030.36"
+        },
+        {
+          "month_key": "2018-02",
+          "revenue": "844178.71"
+        },
+        {
+          "month_key": "2018-03",
+          "revenue": "983213.44"
+        },
+        {
+          "month_key": "2018-04",
+          "revenue": "996647.75"
+        },
+        {
+          "month_key": "2018-05",
+          "revenue": "996517.68"
+        },
+        {
+          "month_key": "2018-06",
+          "revenue": "865124.31"
+        },
+        {
+          "month_key": "2018-07",
+          "revenue": "895507.22"
+        },
+        {
+          "month_key": "2018-08",
+          "revenue": "854686.33"
+        },
+        {
+          "month_key": "2018-09",
+          "revenue": "145.00"
+        }
+      ],
+      "predicted_sql": "SELECT\n  dd.month_key,\n  SUM(foi.line_revenue) AS Revenue\nFROM fact_order_items AS foi\nJOIN dim_date AS dd\n  ON foi.date_id = dd.date_id\nWHERE\n  dd.year = 2018\nGROUP BY\n  dd.month_key\nORDER BY\n  dd.month_key",
+      "predicted_rows": [
+        {
+          "month_key": "2018-01",
+          "Revenue": "950030.36"
+        },
+        {
+          "month_key": "2018-02",
+          "Revenue": "844178.71"
+        },
+        {
+          "month_key": "2018-03",
+          "Revenue": "983213.44"
+        },
+        {
+          "month_key": "2018-04",
+          "Revenue": "996647.75"
+        },
+        {
+          "month_key": "2018-05",
+          "Revenue": "996517.68"
+        },
+        {
+          "month_key": "2018-06",
+          "Revenue": "865124.31"
+        },
+        {
+          "month_key": "2018-07",
+          "Revenue": "895507.22"
+        },
+        {
+          "month_key": "2018-08",
+          "Revenue": "854686.33"
+        },
+        {
+          "month_key": "2018-09",
+          "Revenue": "145.00"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 15.45,
+      "error": null
+    },
+    {
+      "id": "time-revenue-by-year",
+      "category": "time-series",
+      "question": "What is the total revenue per year?",
+      "ordered": false,
+      "gold_sql": "SELECT d.year, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_date d ON d.date_id = f.date_id\n GROUP BY d.year",
+      "gold_rows": [
+        {
+          "year": 2016,
+          "revenue": "49785.92"
+        },
+        {
+          "year": 2017,
+          "revenue": "6155806.98"
+        },
+        {
+          "year": 2018,
+          "revenue": "7386050.80"
+        },
+        {
+          "year": 2026,
+          "revenue": "43.64"
+        }
+      ],
+      "predicted_sql": "SELECT\n  T2.year,\n  SUM(T1.line_revenue) AS total_revenue\nFROM fact_order_items AS T1\nINNER JOIN dim_date AS T2\n  ON T1.date_id = T2.date_id\nGROUP BY\n  T2.year\nORDER BY\n  T2.year",
+      "predicted_rows": [
+        {
+          "year": 2016,
+          "total_revenue": "49785.92"
+        },
+        {
+          "year": 2017,
+          "total_revenue": "6155806.98"
+        },
+        {
+          "year": 2018,
+          "total_revenue": "7386050.80"
+        },
+        {
+          "year": 2026,
+          "total_revenue": "43.64"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 10.13,
+      "error": null
+    },
+    {
+      "id": "time-best-month",
+      "category": "time-series",
+      "question": "Which single month had the highest revenue, and how much was it?",
+      "ordered": true,
+      "gold_sql": "SELECT d.month_key, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_date d ON d.date_id = f.date_id\n GROUP BY d.month_key\n ORDER BY revenue DESC\n LIMIT 1",
+      "gold_rows": [
+        {
+          "month_key": "2017-11",
+          "revenue": "1010271.37"
+        }
+      ],
+      "predicted_sql": "SELECT\n    dd.month_key,\n    SUM(foi.line_revenue) AS total_revenue\nFROM\n    fact_order_items AS foi\nJOIN\n    dim_date AS dd\nON\n    foi.date_id = dd.date_id\nGROUP BY\n    dd.month_key\nORDER BY\n    total_revenue DESC\nLIMIT 1",
+      "predicted_rows": [
+        {
+          "month_key": "2017-11",
+          "total_revenue": "1010271.37"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 9.88,
+      "error": null
+    },
+    {
+      "id": "time-quarterly-2018",
+      "category": "time-series",
+      "question": "What was the revenue in each quarter of 2018?",
+      "ordered": false,
+      "gold_sql": "SELECT d.quarter, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_date d ON d.date_id = f.date_id\n WHERE d.year = 2018\n GROUP BY d.quarter",
+      "gold_rows": [
+        {
+          "quarter": 1,
+          "revenue": "2777422.51"
+        },
+        {
+          "quarter": 2,
+          "revenue": "2858289.74"
+        },
+        {
+          "quarter": 3,
+          "revenue": "1750338.55"
+        }
+      ],
+      "predicted_sql": "SELECT\n  T2.quarter,\n  SUM(T1.line_revenue) AS Revenue\nFROM fact_order_items AS T1\nINNER JOIN dim_date AS T2\n  ON T1.date_id = T2.date_id\nWHERE\n  T2.year = 2018\nGROUP BY\n  T2.quarter\nORDER BY\n  T2.quarter",
+      "predicted_rows": [
+        {
+          "quarter": 1,
+          "Revenue": "2777422.51"
+        },
+        {
+          "quarter": 2,
+          "Revenue": "2858289.74"
+        },
+        {
+          "quarter": 3,
+          "Revenue": "1750338.55"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 11.5,
+      "error": null
+    },
+    {
+      "id": "trap-distinct-customers",
+      "category": "trap",
+      "question": "How many distinct customers do we have?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT customer_unique_key) AS customers FROM dim_customer",
+      "gold_rows": [
+        {
+          "customers": 96096
+        }
+      ],
+      "predicted_sql": "SELECT COUNT(DISTINCT dim_customer.customer_unique_key) FROM dim_customer",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT dim_customer.customer_unique_key)": 96096
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 11.29,
+      "error": null
+    },
+    {
+      "id": "trap-late-rate",
+      "category": "trap",
+      "question": "What percentage of delivered order lines arrived after the estimated delivery date?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(is_late) * 100.0 / COUNT(is_late), 2) AS pct_late\n  FROM fact_order_items\n WHERE is_late IS NOT NULL",
+      "gold_rows": [
+        {
+          "pct_late": "7.91"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(is_late) / COUNT(is_late) FROM fact_order_items WHERE is_late IS NOT NULL",
+      "predicted_rows": [
+        {
+          "SUM(is_late) / COUNT(is_late)": "0.0791"
+        }
+      ],
+      "verdict": "FAIL",
+      "corrections": 0,
+      "seconds": 12.99,
+      "error": null
+    },
+    {
+      "id": "trap-line-count",
+      "category": "trap",
+      "question": "How many order lines are there in total?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(*) AS lines_count FROM fact_order_items",
+      "gold_rows": [
+        {
+          "lines_count": 112652
+        }
+      ],
+      "predicted_sql": "SELECT COUNT(*) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "COUNT(*)": 112652
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 11.72,
+      "error": null
+    },
+    {
+      "id": "trap-avg-order-value",
+      "category": "trap",
+      "question": "What is the average order value?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(line_total) / COUNT(DISTINCT order_key), 2) AS aov\n  FROM fact_order_items",
+      "gold_rows": [
+        {
+          "aov": "160.58"
+        }
+      ],
+      "predicted_sql": "SELECT SUM(line_total) / COUNT(DISTINCT order_key) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "SUM(line_total) / COUNT(DISTINCT order_key)": "160.575130"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 5.51,
+      "error": null
+    },
+    {
+      "id": "join-category-by-region",
+      "category": "multi-join",
+      "question": "What is the revenue for the health_beauty category in the Southeast region?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_product p   ON p.product_id   = f.product_id\n  JOIN dim_geography g ON g.geography_id = f.geography_id\n WHERE p.category = 'health_beauty' AND g.region = 'Southeast'",
+      "gold_rows": [
+        {
+          "revenue": "785376.63"
+        }
+      ],
+      "predicted_sql": "SELECT\n  SUM(foi.line_revenue)\nFROM fact_order_items AS foi\nJOIN dim_product AS dp\n  ON foi.product_id = dp.product_id\nJOIN dim_geography AS dg\n  ON foi.geography_id = dg.geography_id\nWHERE\n  dp.category = 'health_beauty' AND dg.region = 'Southeast'",
+      "predicted_rows": [
+        {
+          "SUM(foi.line_revenue)": "785376.63"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 7.61,
+      "error": null
+    },
+    {
+      "id": "join-top-category-2017",
+      "category": "multi-join",
+      "question": "Which product category had the highest revenue in 2017, and how much was it?",
+      "ordered": true,
+      "gold_sql": "SELECT p.category, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_product p ON p.product_id = f.product_id\n  JOIN dim_date d    ON d.date_id    = f.date_id\n WHERE d.year = 2017\n GROUP BY p.category\n ORDER BY revenue DESC\n LIMIT 1",
+      "gold_rows": [
+        {
+          "category": "bed_bath_table",
+          "revenue": "498440.43"
+        }
+      ],
+      "predicted_sql": "SELECT\n  dp.category,\n  SUM(foi.line_revenue) AS total_revenue\nFROM fact_order_items AS foi\nJOIN dim_product AS dp\n  ON foi.product_id = dp.product_id\nJOIN dim_date AS dd\n  ON foi.date_id = dd.date_id\nWHERE\n  YEAR(dd.full_date) = 2017\nGROUP BY\n  dp.category\nORDER BY\n  total_revenue DESC\nLIMIT 1",
+      "predicted_rows": [
+        {
+          "category": "bed_bath_table",
+          "total_revenue": "498440.43"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 12.88,
+      "error": null
+    },
+    {
+      "id": "join-delivered-region-2018",
+      "category": "multi-join",
+      "question": "What was the delivered revenue by region in 2018?",
+      "ordered": false,
+      "gold_sql": "SELECT g.region, ROUND(SUM(f.line_revenue), 2) AS revenue\n  FROM fact_order_items f\n  JOIN dim_geography g ON g.geography_id = f.geography_id\n  JOIN dim_date d      ON d.date_id      = f.date_id\n WHERE d.year = 2018 AND f.order_status = 'DELIVERED'\n GROUP BY g.region",
+      "gold_rows": [
+        {
+          "region": "Southeast",
+          "revenue": "4786465.60"
+        },
+        {
+          "region": "South",
+          "revenue": "1033729.07"
+        },
+        {
+          "region": "Central-West",
+          "revenue": "451261.13"
+        },
+        {
+          "region": "Northeast",
+          "revenue": "785140.40"
+        },
+        {
+          "region": "North",
+          "revenue": "161528.92"
+        }
+      ],
+      "predicted_sql": "SELECT\n  T2.region,\n  SUM(T1.line_revenue) AS delivered_revenue\nFROM fact_order_items AS T1\nINNER JOIN dim_geography AS T2\n  ON T1.geography_id = T2.geography_id\nINNER JOIN dim_date AS T3\n  ON T1.date_id = T3.date_id\nWHERE\n  T1.order_status = 'DELIVERED' AND T3.year = 2018\nGROUP BY\n  T2.region",
+      "predicted_rows": [
+        {
+          "region": "Southeast",
+          "delivered_revenue": "4786465.60"
+        },
+        {
+          "region": "South",
+          "delivered_revenue": "1033729.07"
+        },
+        {
+          "region": "Central-West",
+          "delivered_revenue": "451261.13"
+        },
+        {
+          "region": "Northeast",
+          "delivered_revenue": "785140.40"
+        },
+        {
+          "region": "North",
+          "delivered_revenue": "161528.92"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 15.68,
+      "error": null
+    },
+    {
+      "id": "join-avg-delivery-by-region",
+      "category": "multi-join",
+      "question": "What is the average delivery time in days for each region?",
+      "ordered": false,
+      "gold_sql": "SELECT g.region, ROUND(AVG(f.delivery_days), 2) AS avg_days\n  FROM fact_order_items f\n  JOIN dim_geography g ON g.geography_id = f.geography_id\n WHERE f.delivery_days IS NOT NULL\n GROUP BY g.region",
+      "gold_rows": [
+        {
+          "region": "North",
+          "avg_days": "22.55"
+        },
+        {
+          "region": "Northeast",
+          "avg_days": "19.85"
+        },
+        {
+          "region": "Central-West",
+          "avg_days": "14.88"
+        },
+        {
+          "region": "Southeast",
+          "avg_days": "10.62"
+        },
+        {
+          "region": "South",
+          "avg_days": "13.93"
+        }
+      ],
+      "predicted_sql": "SELECT\n  T2.region,\n  AVG(T1.delivery_days) AS `Average Delivery Time`\nFROM fact_order_items AS T1\nINNER JOIN dim_geography AS T2\n  ON T1.geography_id = T2.geography_id\nWHERE\n  T1.delivery_days IS NOT NULL\nGROUP BY\n  T2.region\nORDER BY\n  T2.region",
+      "predicted_rows": [
+        {
+          "region": "Central-West",
+          "Average Delivery Time": "14.8753"
+        },
+        {
+          "region": "North",
+          "Average Delivery Time": "22.5461"
+        },
+        {
+          "region": "Northeast",
+          "Average Delivery Time": "19.8540"
+        },
+        {
+          "region": "South",
+          "Average Delivery Time": "13.9339"
+        },
+        {
+          "region": "Southeast",
+          "Average Delivery Time": "10.6193"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 10.85,
+      "error": null
+    },
+    {
+      "id": "ratio-freight-share",
+      "category": "ratio",
+      "question": "What percentage of the total amount customers paid was freight?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(SUM(freight_amount) * 100.0 / SUM(line_total), 2) AS freight_pct\n  FROM fact_order_items",
+      "gold_rows": [
+        {
+          "freight_pct": "14.21"
+        }
+      ],
+      "predicted_sql": "SELECT\n  SUM(fact_order_items.freight_amount) / SUM(fact_order_items.line_total) * 100\nFROM fact_order_items",
+      "predicted_rows": [
+        {
+          "SUM(fact_order_items.freight_amount) / SUM(fact_order_items.line_total) * 100": "14.213536"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 29.75,
+      "error": null
+    },
+    {
+      "id": "ratio-late-by-region",
+      "category": "ratio",
+      "question": "What is the late delivery rate for each region?",
+      "ordered": false,
+      "gold_sql": "SELECT g.region, ROUND(SUM(f.is_late) * 100.0 / COUNT(f.is_late), 2) AS pct_late\n  FROM fact_order_items f\n  JOIN dim_geography g ON g.geography_id = f.geography_id\n WHERE f.is_late IS NOT NULL\n GROUP BY g.region",
+      "gold_rows": [
+        {
+          "region": "North",
+          "pct_late": "9.86"
+        },
+        {
+          "region": "Northeast",
+          "pct_late": "14.16"
+        },
+        {
+          "region": "Central-West",
+          "pct_late": "7.90"
+        },
+        {
+          "region": "Southeast",
+          "pct_late": "7.25"
+        },
+        {
+          "region": "South",
+          "pct_late": "6.84"
+        }
+      ],
+      "predicted_sql": "SELECT\n  dg.region,\n  SUM(foi.is_late) / COUNT(foi.is_late) AS late_delivery_rate\nFROM fact_order_items AS foi\nJOIN dim_geography AS dg\n  ON foi.geography_id = dg.geography_id\nWHERE\n  foi.is_late IS NOT NULL\nGROUP BY\n  dg.region\nORDER BY\n  dg.region",
+      "predicted_rows": [
+        {
+          "region": "Central-West",
+          "late_delivery_rate": "0.0790"
+        },
+        {
+          "region": "North",
+          "late_delivery_rate": "0.0986"
+        },
+        {
+          "region": "Northeast",
+          "late_delivery_rate": "0.1416"
+        },
+        {
+          "region": "South",
+          "late_delivery_rate": "0.0684"
+        },
+        {
+          "region": "Southeast",
+          "late_delivery_rate": "0.0725"
+        }
+      ],
+      "verdict": "FAIL",
+      "corrections": 0,
+      "seconds": 21.11,
+      "error": null
+    },
+    {
+      "id": "ratio-avg-unit-price",
+      "category": "ratio",
+      "question": "What is the average unit price across all order lines?",
+      "ordered": false,
+      "gold_sql": "SELECT ROUND(AVG(unit_price), 2) AS avg_price FROM fact_order_items",
+      "gold_rows": [
+        {
+          "avg_price": "120.65"
+        }
+      ],
+      "predicted_sql": "SELECT AVG(unit_price) FROM fact_order_items",
+      "predicted_rows": [
+        {
+          "AVG(unit_price)": "120.651791"
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 6.34,
+      "error": null
+    },
+    {
+      "id": "count-categories",
+      "category": "counting",
+      "question": "How many distinct product categories are there?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT category) AS categories FROM dim_product WHERE category IS NOT NULL",
+      "gold_rows": [
+        {
+          "categories": 71
+        }
+      ],
+      "predicted_sql": "SELECT COUNT(DISTINCT category) FROM dim_product",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT category)": 71
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 6.08,
+      "error": null
+    },
+    {
+      "id": "count-products-sold",
+      "category": "counting",
+      "question": "How many distinct products have actually been sold?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT product_id) AS products FROM fact_order_items",
+      "gold_rows": [
+        {
+          "products": 32951
+        }
+      ],
+      "predicted_sql": "SELECT\n  COUNT(DISTINCT product_id)\nFROM fact_order_items\nWHERE\n  order_status = 'DELIVERED'",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT product_id)": 32216
+        }
+      ],
+      "verdict": "FAIL",
+      "corrections": 0,
+      "seconds": 17.01,
+      "error": null
+    },
+    {
+      "id": "count-states",
+      "category": "counting",
+      "question": "How many different states have customers ordered from?",
+      "ordered": false,
+      "gold_sql": "SELECT COUNT(DISTINCT state) AS states FROM dim_customer WHERE state IS NOT NULL",
+      "gold_rows": [
+        {
+          "states": 27
+        }
+      ],
+      "predicted_sql": "SELECT\n    COUNT(DISTINCT T1.state)\nFROM\n    dim_customer AS T1\nINNER JOIN\n    fact_order_items AS T2\nON\n    T1.customer_id = T2.customer_id",
+      "predicted_rows": [
+        {
+          "COUNT(DISTINCT T1.state)": 27
+        }
+      ],
+      "verdict": "PASS",
+      "corrections": 0,
+      "seconds": 24.62,
+      "error": null
+    }
+  ]
+}
