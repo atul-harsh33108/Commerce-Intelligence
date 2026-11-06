@@ -1,0 +1,867 @@
+# The whole platform, locally.
+#
+# Split by Compose profile rather than into several files, because "one command starts everything" is
+# a deliverable and `-f a.yml -f b.yml -f c.yml` is not one command:
+#
+#   docker compose up -d                       infrastructure only (databases, Kafka, Redis, ES)
+#   docker compose --profile apps up -d        + the Java services (needs `./mvnw package` first)
+#   docker compose --profile agent up -d       + the NL->SQL agent and its vector/embedding stack
+#   docker compose --profile observability up -d   + Prometheus, Grafana and Zipkin
+#   docker compose --profile cdc up -d         + Kafka Connect with Debezium
+#
+# Profiles compose, so `--profile apps --profile agent` is the full system.
+#
+# EVERY DATABASE HERE IS A CONTAINER, AND THAT IS THE COST DISCIPLINE. The AWS equivalents are named
+# in docs/decisions.md (D13) and in k8s/README.md - RDS, MSK, ElastiCache, OpenSearch, EKS - and
+# nothing in this repository provisions any of them. Running the real thing costs real money; running
+# the same images locally costs a laptop.
+
+# The project name namespaces every container, network and volume Compose creates. Set explicitly
+# because the default is the directory name, and an unrelated project on this machine already claimed
+# `ecommerce` - `docker compose up` in one directory then recreates containers belonging to the
+# other. A one-line collision that silently destroys somebody else's running stack.
+name: ecommerce-ai
+
+services:
+
+  # ---------------------------------------------------------------------------------------------
+  # OLTP: one PostgreSQL per service. Five containers, not five schemas in one server.
+  #
+  # A shared server with five databases would look identical from the application's side and would
+  # quietly restore the coupling the split removed: one `ALTER SYSTEM`, one bad query, one restart
+  # affects every service. It also makes "this service owns its data" unenforceable - anyone with the
+  # server's credentials can read everything. Separate containers make the boundary physical, and
+  # Step 8's Debezium connectors need per-database logical replication slots anyway.
+  # ---------------------------------------------------------------------------------------------
+
+  user-db:
+    image: postgres:17-alpine
+    container_name: ecommerce-user-db
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: userdb
+      POSTGRES_PASSWORD: userdb
+    ports: ["5433:5432"]
+    volumes: ["user-pgdata:/var/lib/postgresql/data"]
+    # wal_level=logical is what Debezium's Postgres connector needs (Step 8). Set on every OLTP
+    # database rather than only the two that are captured today, because turning it on requires a
+    # RESTART - discovering that mid-demo is worse than the small extra WAL volume.
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U userdb -d userdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 256M } } }
+
+  catalog-db:
+    image: postgres:17-alpine
+    container_name: ecommerce-catalog-db
+    environment:
+      POSTGRES_DB: catalogdb
+      POSTGRES_USER: catalogdb
+      POSTGRES_PASSWORD: catalogdb
+    ports: ["5434:5432"]
+    volumes: ["catalog-pgdata:/var/lib/postgresql/data"]
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalogdb -d catalogdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 384M } } }
+
+  inventory-db:
+    image: postgres:17-alpine
+    container_name: ecommerce-inventory-db
+    environment:
+      POSTGRES_DB: inventorydb
+      POSTGRES_USER: inventorydb
+      POSTGRES_PASSWORD: inventorydb
+    ports: ["5435:5432"]
+    volumes: ["inventory-pgdata:/var/lib/postgresql/data"]
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventorydb -d inventorydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 256M } } }
+
+  order-db:
+    image: postgres:17-alpine
+    container_name: ecommerce-order-db
+    environment:
+      POSTGRES_DB: orderdb
+      POSTGRES_USER: orderdb
+      POSTGRES_PASSWORD: orderdb
+    ports: ["5436:5432"]
+    volumes: ["order-pgdata:/var/lib/postgresql/data"]
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderdb -d orderdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 512M } } }
+
+  payment-db:
+    image: postgres:17-alpine
+    container_name: ecommerce-payment-db
+    environment:
+      POSTGRES_DB: paymentdb
+      POSTGRES_USER: paymentdb
+      POSTGRES_PASSWORD: paymentdb
+    ports: ["5437:5432"]
+    volumes: ["payment-pgdata:/var/lib/postgresql/data"]
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paymentdb -d paymentdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 256M } } }
+
+  # ---------------------------------------------------------------------------------------------
+  # OLAP: the star-schema warehouse, and the agent's metadata catalogue.
+  #
+  # MySQL, not Postgres, and that is a deliberate decision rather than an inconsistency - see
+  # docs/decisions.md D1. The existing NL->SQL agent is metadata-driven against MySQL 8; pointing it
+  # at a Postgres warehouse would mean a dialect change in generated SQL, a driver change, and a
+  # rewrite of the thing this project is supposed to integrate rather than rebuild. It also makes
+  # Step 8's pipeline genuinely cross-engine, which is what forces real CDC instead of a copy.
+  # ---------------------------------------------------------------------------------------------
+
+  warehouse-db:
+    image: mysql:8.0
+    container_name: ecommerce-warehouse-db
+    environment:
+      MYSQL_ROOT_PASSWORD: warehouse
+      MYSQL_DATABASE: dw
+      MYSQL_USER: warehouse
+      MYSQL_PASSWORD: warehouse
+    ports: ["3307:3306"]
+    volumes:
+      - warehouse-mysqldata:/var/lib/mysql
+      - ./warehouse/ddl:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      # The warehouse holds a few million fact rows and answers GROUP BY over all of them. The
+      # default 128M buffer pool turns that into a disk scan per query; 512M holds the working set.
+      - --innodb-buffer-pool-size=512M
+      # ONLY_FULL_GROUP_BY off. Not laziness: the agent generates SQL from an LLM, and a query that
+      # selects a column not in GROUP BY is a *semantically* answerable question that MySQL 8's
+      # default rejects outright. Turning it off widens what the agent can answer at the cost of
+      # letting an ambiguous aggregate through - a trade worth making for an analytics read replica
+      # and not for an OLTP database.
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -pwarehouse --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    deploy: { resources: { limits: { memory: 1G } } }
+
+  # ---------------------------------------------------------------------------------------------
+  # The event backbone.
+  # ---------------------------------------------------------------------------------------------
+
+  kafka:
+    # KRaft, not ZooKeeper. ZooKeeper is removed in Kafka 4.x, and a project that still stands up a
+    # ZooKeeper ensemble is teaching an architecture that no longer exists.
+    image: apache/kafka:3.9.1
+    container_name: ecommerce-kafka
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # TWO LISTENERS, and this is the single most common local-Kafka failure. A broker tells clients
+      # where to reconnect via its ADVERTISED listener, so one listener cannot serve both the host
+      # (which must be told `localhost:9092`) and other containers (which must be told
+      # `kafka:29092`). With one, whichever side is not the advertised one connects, gets told to go
+      # somewhere it cannot resolve, and hangs until it times out - with a bootstrap that succeeded.
+      KAFKA_LISTENERS: INTERNAL://:29092,HOST://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,HOST://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # OFF. Auto-creation is convenient exactly once and then costs you: a typo in a topic name
+      # silently becomes a brand new topic that nothing publishes to and nothing reads, and the
+      # symptom is a consumer that is simply quiet. Each producing service declares its own topics.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes: ["kafka-data:/var/lib/kafka/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+    deploy: { resources: { limits: { memory: 1G } } }
+
+  # ---------------------------------------------------------------------------------------------
+  # Caching and search.
+  # ---------------------------------------------------------------------------------------------
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    ports: ["6379:6379"]
+    volumes: ["redis-data:/data"]
+    # maxmemory + an eviction policy, because a cache without a bound is a memory leak that takes a
+    # week to show up. `allkeys-lru` rather than `noeviction`: the catalog cache is genuinely
+    # disposable, and a cache that returns OOM on write turns a warm-path optimisation into an
+    # outage. Carts live in Redis too and are NOT disposable - which is exactly why they are written
+    # with an explicit TTL and treated as recoverable, never as the source of truth.
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 320M } } }
+
+  elasticsearch:
+    image: elasticsearch:8.19.10
+    container_name: ecommerce-elasticsearch
+    environment:
+      discovery.type: single-node
+      # Off, locally. Security on means a generated password, a CA certificate to distribute, and
+      # https for every client - all of which is correct in production and all of which is friction
+      # for a laptop. The AWS mapping is OpenSearch with fine-grained access control; see
+      # docs/decisions.md D13.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports: ["9200:9200"]
+    volumes: ["es-data:/usr/share/elasticsearch/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    deploy: { resources: { limits: { memory: 1G } } }
+
+  # ---------------------------------------------------------------------------------------------
+  # CDC: Debezium on Kafka Connect. `docker compose --profile cdc up -d`
+  #
+  # This is the source half of Step 8 and the only half that is genuinely "change data capture":
+  # Debezium reads PostgreSQL's write-ahead log through a logical replication slot and turns every
+  # INSERT/UPDATE/DELETE into a Kafka record. No polling, no `updated_at > ?` query, no load on the
+  # OLTP database beyond replication, and - the property that matters - no missed changes, because
+  # the WAL is the same thing Postgres itself uses to guarantee durability.
+  #
+  # The SINK half is deliberately NOT a Kafka Connect JDBC sink. See warehouse/etl/cdc_sink.py: a
+  # JDBC sink writes a table copy, and the warehouse needs a star schema, which is a different shape.
+  # ---------------------------------------------------------------------------------------------
+
+  kafka-connect:
+    image: quay.io/debezium/connect:2.7
+    container_name: ecommerce-kafka-connect
+    profiles: ["cdc"]
+    ports: ["8093:8083"]
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: ecommerce-connect
+      # Connect stores its own state in Kafka topics rather than on disk, which is what lets a
+      # Connect worker be replaced without losing which offsets a connector had reached.
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      # SCHEMAS OFF. Debezium's default envelope embeds a full Avro-style schema in EVERY message,
+      # which roughly triples the payload and buys nothing here: the sink is a Python consumer that
+      # reads the fields it needs. With a Java sink or a schema registry the answer would be the
+      # opposite.
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8083/connectors || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 1G } } }
+
+
+  # ---------------------------------------------------------------------------------------------
+  # The NL->SQL agent and what it needs. `docker compose --profile agent up -d`
+  #
+  # It reuses the platform's Elasticsearch (different index) and Redis (different database number)
+  # rather than standing up its own, and it reads the warehouse through `warehouse_ro`. What it does
+  # NOT reuse is a database for its own logs - same rule as every other service.
+  # ---------------------------------------------------------------------------------------------
+
+  qdrant:
+    image: qdrant/qdrant:v1.16
+    container_name: ecommerce-qdrant
+    profiles: ["agent"]
+    ports:
+      - "6333:6333"   # HTTP
+      - "6334:6334"   # gRPC
+    volumes: ["qdrant-data:/qdrant/storage"]
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  embedding:
+    # Hugging Face's Text Embeddings Inference, CPU build.
+    #
+    # THE MODEL IS MOUNTED FROM THE HOST, not baked into an image and not downloaded at container
+    # start. A 1.3 GB download inside an image build is slow and unreproducible, and it moves a
+    # licence acceptance from a person to a Dockerfile.
+    #
+    # EMBEDDING_MODEL_DIR is an env var rather than a fixed path because the weights are large enough
+    # that having two copies on one machine is worth avoiding. `dataquery-agent` already has this
+    # exact model, so pointing at it costs nothing:
+    #
+    #     EMBEDDING_MODEL_DIR=D:/project/dataquery-agent/docker/embedding/bge-large-en-v1.5
+    #
+    # The default keeps the repository self-contained for anyone who does not have that copy.
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    container_name: ecommerce-embedding
+    profiles: ["agent"]
+    ports: ["8090:80"]
+    environment:
+      MODEL_ID: /models/bge-large-en-v1.5
+      MAX_CONCURRENT_REQUESTS: "16"
+      # 4096, NOT the upstream project's 16384.
+      #
+      # TEI allocates activations for a full batch of this many tokens at warm-up. bge-large is 335M
+      # parameters in fp32 (~1.3 GB of weights) and a 16384-token batch on top of that exceeded the
+      # container limit - the process was OOM-killed during "Warming up model" with exit 137, which
+      # presents as a container that simply stops with no error in its own log.
+      #
+      # Worth noting that `dq-embedding` in the source project is sitting in `docker ps -a` with the
+      # same exit 137 from four months ago. The setting was inherited, not chosen.
+      #
+      # This workload embeds ~50 short column descriptions at index time and one question at query
+      # time. 4096 tokens is far more than either needs; 16384 was buying nothing and costing the
+      # service.
+      MAX_BATCH_TOKENS: "4096"
+    volumes:
+      - ${EMBEDDING_MODEL_DIR:-./agent/models/bge-large-en-v1.5}:/models/bge-large-en-v1.5:ro
+    # 4 GB. The weights alone are 1.3 GB and TEI needs room for tokenisation workers and activations
+    # on top; 2 GB was not enough to finish warming up. Sized by watching it fail rather than by
+    # guessing upward.
+    deploy: { resources: { limits: { memory: 4G } } }
+
+  agent-logs-db:
+    image: postgres:16-alpine
+    container_name: ecommerce-agent-logs-db
+    profiles: ["agent"]
+    environment:
+      POSTGRES_DB: query_logs
+      POSTGRES_USER: agentlogs
+      POSTGRES_PASSWORD: agentlogs
+    ports: ["5438:5432"]
+    volumes:
+      - agent-logs-pgdata:/var/lib/postgresql/data
+      - ./agent/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentlogs -d query_logs"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy: { resources: { limits: { memory: 256M } } }
+
+  analytics-agent:
+    build:
+      context: ./agent/backend
+    image: ecommerce/analytics-agent:latest
+    container_name: ecommerce-analytics-agent
+    profiles: ["agent"]
+    environment:
+      APP_CONFIG_FILE: /app/conf/app_config.docker.yaml
+      # NO DEFAULT. A missing key must fail loudly at startup rather than produce an agent that
+      # answers every question with an authentication error from a provider.
+      # `:-` (default to empty), NOT `:?` (required), and that is a fix rather than a weakening.
+      #
+      # Compose interpolates the ENTIRE file before it looks at profiles, so `:?` here refused to
+      # start ANY profile without a Gemini key - including `--profile apps`, which does not involve
+      # the agent at all. The first real deployment died on exactly this:
+      #
+      #   error while interpolating services.analytics-agent.environment.GEMINI_API_KEY:
+      #   required variable GEMINI_API_KEY is missing a value
+      #
+      # ...while deploying the Java platform, which needs no such key. A guard that makes unrelated
+      # deployments impossible is a worse defect than the one it was added to prevent, and CI had
+      # already been quietly working around it by passing `dummy-for-validation`.
+      #
+      # The original concern stands and is handled where it belongs: an agent started without a key
+      # answers every question with a provider authentication error, so docs/agent-setup.md makes
+      # setting it step one, and scripts/validate_agent_metadata.py fails loudly without it.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      # Published for development only. The supported route is the gateway
+      # (/api/analytics/**), which is where authentication happens - an agent exposed
+      # directly is an unauthenticated door into the warehouse.
+      - "8000:8000"
+    volumes:
+      # THE CONFIG IS MOUNTED, NOT ONLY BAKED IN, and this is a fix rather than convenience.
+      #
+      # The Dockerfile does `COPY conf ./conf`, so meta_config.yaml lives inside the image. Editing
+      # it on the host and re-running the knowledge-base builder therefore rebuilt from the OLD
+      # descriptions - silently, with a success message. Two metadata fixes appeared to do nothing
+      # for exactly this reason, and the evidence was a generated query reproducing the previous
+      # description's formula verbatim.
+      #
+      # Read-only: the container reads configuration, it does not own it.
+      - ./agent/backend/conf:/app/conf:ro
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+      agent-logs-db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy: { resources: { limits: { memory: 1G } } }
+
+
+
+  # -----------------------------------------------------------------------------------------------
+  # A NOTE ON `depends_on` CONDITIONS, because the first real deployment died on this.
+  #
+  # Every dependency below waits for `service_healthy`, not `service_started`. The distinction is the
+  # difference between "the container exists" and "the process inside it can answer" - and for a
+  # config server those are about forty seconds apart on a shared four-vCPU host.
+  #
+  # With `service_started` on config-server, api-gateway launched immediately, could not fetch its
+  # configuration, exhausted its ~21 seconds of retry backoff, and exited 1:
+  #
+  #   ConfigClientFailFastException: Could not locate PropertySource and the fail fast property is set
+  #
+  # ...which then cascaded, because Compose refuses to start anything that depended on it. Nine
+  # services, one of which was actually broken, and the visible symptom was a gateway that "would not
+  # start" - pointing at the last thing to fail rather than the first.
+  #
+  # fail-fast is correct and stays: a service silently running on bundled defaults because the config
+  # server was unreachable is a far worse outcome. What was wrong was asking it to start too early.
+  # -----------------------------------------------------------------------------------------------
+
+  # -----------------------------------------------------------------------------------------------
+  # THE JAVA SERVICES.  `docker compose --profile apps up -d`
+  #
+  # Requires the jars: `cd ecommerce-platform && ./mvnw -DskipTests package` first. See the comment
+  # at the top of ecommerce-platform/Dockerfile for why the build is not inside the image.
+  #
+  # ONE CODE BASE, TWO ENVIRONMENTS, and the difference between them is entirely the environment
+  # variables below. Nothing here is a second copy of anything: every address the services need is
+  # already `${VAR:localhost-default}` in config-repo, so running as a host JVM
+  # (scripts/dev-stack.ps1) and running as a container differ only in what those variables resolve
+  # to. That property is worth more than it looks - it is the thing that makes a Kubernetes
+  # deployment a ConfigMap rather than a fork.
+  #
+  # `kafka:29092`, not `localhost:9092`: the broker advertises two listeners and a container has to
+  # use the internal one. Getting this wrong produces a client that connects, is redirected to
+  # `localhost:9092`, and then talks to itself.
+  # -----------------------------------------------------------------------------------------------
+
+  config-server:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: config-server }
+    image: ecommerce/config-server:local
+    container_name: ecommerce-config-server
+    profiles: ["apps"]
+    ports: ["8888:8888"]
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      CONFIG_REPO: file:/config-repo
+    volumes:
+      # The config repo is MOUNTED, not baked into the image, and that is the point of the native
+      # profile rather than an accident of packaging. Configuration changes without rebuilding or
+      # redeploying anything - edit a file here, POST /actuator/refresh on a service, and it rebinds.
+      # Baking it in would make every property change a new image of every service that reads it.
+      #
+      # In Kubernetes this bind mount is a ConfigMap and the rest is identical. That equivalence is
+      # the reason the `git` profile also exists and is documented: on a real cluster the repository
+      # is the source of truth and this mount is the local stand-in for it.
+      - ./ecommerce-platform/config-repo:/config-repo:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  discovery-server:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: discovery-server }
+    image: ecommerce/discovery-server:local
+    container_name: ecommerce-discovery-server
+    profiles: ["apps"]
+    ports: ["8761:8761"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  api-gateway:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: api-gateway }
+    image: ecommerce/api-gateway:local
+    container_name: ecommerce-api-gateway
+    profiles: ["apps"]
+    ports: ["8080:8080"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      AGENT_URL: http://analytics-agent:8000
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  user-service:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: user-service }
+    image: ecommerce/user-service:local
+    container_name: ecommerce-user-service
+    profiles: ["apps"]
+    ports: ["8081:8081"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      DB_URL: jdbc:postgresql://user-db:5432/userdb
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      user-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  catalog-service:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: catalog-service }
+    image: ecommerce/catalog-service:local
+    container_name: ecommerce-catalog-service
+    profiles: ["apps"]
+    ports: ["8082:8082"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      DB_URL: jdbc:postgresql://catalog-db:5432/catalogdb
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      catalog-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  inventory-service:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: inventory-service }
+    image: ecommerce/inventory-service:local
+    container_name: ecommerce-inventory-service
+    profiles: ["apps"]
+    ports: ["8083:8083"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      DB_URL: jdbc:postgresql://inventory-db:5432/inventorydb
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      inventory-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  order-service:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: order-service }
+    image: ecommerce/order-service:local
+    container_name: ecommerce-order-service
+    profiles: ["apps"]
+    ports: ["8084:8084"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      DB_URL: jdbc:postgresql://order-db:5432/orderdb
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      order-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  payment-service:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: payment-service }
+    image: ecommerce/payment-service:local
+    container_name: ecommerce-payment-service
+    profiles: ["apps"]
+    ports: ["8085:8085"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      DB_URL: jdbc:postgresql://payment-db:5432/paymentdb
+      # The fault-injection knob, passed through from the shell so the compensation demo can be
+      # driven without editing this file:
+      #
+      #   PAYMENT_FAILURE_RATE=1.0 docker compose --profile apps up -d payment-service
+      #   python scripts/saga_demo.py --expect-fail
+      #
+      # Compose only forwards variables a service actually declares. Without this line, setting
+      # PAYMENT_FAILURE_RATE in the shell does nothing at all and the demo reports that payment
+      # refused to decline - which is exactly what happened the first time it was tried against
+      # containers rather than host JVMs.
+      PAYMENT_FAILURE_RATE: "${PAYMENT_FAILURE_RATE:-0.0}"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      payment-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  search-service:
+    build:
+      context: ./ecommerce-platform
+      args: { MODULE: search-service }
+    image: ecommerce/search-service:local
+    container_name: ecommerce-search-service
+    profiles: ["apps"]
+    ports: ["8086:8086"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8086/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 768M } } }
+
+  # -----------------------------------------------------------------------------------------------
+  # OBSERVABILITY (Step 13). `--profile observability`, so the default `docker compose up` stays the
+  # set of things the platform cannot run without. Prometheus and Zipkin are how you find out WHY it
+  # is slow; they are not how it works.
+  # -----------------------------------------------------------------------------------------------
+  zipkin:
+    image: openzipkin/zipkin:3.5
+    container_name: ecommerce-zipkin
+    profiles: ["observability"]
+    ports: ["9411:9411"]
+    environment:
+      # In-memory storage. Traces are lost on restart, which is correct for a laptop and would be
+      # indefensible in production - there, this is Elasticsearch or Cassandra behind the same API.
+      # Naming it here so the limitation is a choice rather than a default nobody looked at.
+      STORAGE_TYPE: mem
+      # 50k spans, in a 1 GB container. Both numbers are a correction.
+      #
+      # The first attempt was 100k spans in 512 MB, and Zipkin ran for about three hours and then
+      # died with `Terminating due to java.lang.OutOfMemoryError: Java heap space`. The arithmetic
+      # was never checked: an in-memory span with tags and endpoints is on the order of 1-3 KB, so
+      # 100k of them is 100-300 MB of live data plus Armeria's buffers plus the JVM's own overhead,
+      # against a 512 MB cgroup limit.
+      #
+      # What made it fill so fast is the more interesting half. Sampling is 1.0, and the busiest
+      # traced traffic on an idle platform is not orders - it is Prometheus scraping nine
+      # /actuator/prometheus endpoints every ten seconds and nine Eureka clients heartbeating every
+      # thirty. The observability stack is its own heaviest user. Same effect that made the order
+      # trace impossible to find by "most recent" - see docs/reflection.md.
+      MEM_MAX_SPANS: 50000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9411/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy: { resources: { limits: { memory: 1G } } }
+
+  prometheus:
+    image: prom/prometheus:v3.6.0
+    container_name: ecommerce-prometheus
+    profiles: ["observability"]
+    # 9091 on the HOST, 9090 inside. 9090 was already taken - it is the api-gateway's separate
+    # management port, which exists so that no route through the edge can reach actuator. Grafana
+    # still reaches it as `http://prometheus:9090` because that is container-to-container on the
+    # compose network and never touches the host's port space.
+    ports: ["9091:9090"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+      # Needed by Grafana's "Explore" and by exemplars; harmless otherwise.
+      - --web.enable-lifecycle
+    # NOT on the compose network alone. The Java services run as host JVMs (see scripts/dev-stack.ps1),
+    # not containers, so Prometheus has to reach the host - `host.docker.internal` in the scrape
+    # config, and this line is what makes that name resolve on Linux as well as Docker Desktop.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy: { resources: { limits: { memory: 512M } } }
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: ecommerce-grafana
+    profiles: ["observability"]
+    ports: ["3001:3000"]
+    environment:
+      # Anonymous admin access. On a laptop a login screen in front of a dashboard nobody else can
+      # reach is friction with no security value - the port is bound to localhost and the data is
+      # metrics about a demo. In any shared environment this block is the first thing to delete.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+      # 3001 on the host because 3000 is the storefront. Grafana needs to know its own external URL
+      # or every generated link points at a port nothing is listening on.
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    deploy: { resources: { limits: { memory: 512M } } }
+
+
+volumes:
+  user-pgdata:
+  catalog-pgdata:
+  inventory-pgdata:
+  order-pgdata:
+  payment-pgdata:
+  warehouse-mysqldata:
+  kafka-data:
+  redis-data:
+  es-data:
+  qdrant-data:
+  agent-logs-pgdata:
+  prometheus-data:
+  grafana-data:
