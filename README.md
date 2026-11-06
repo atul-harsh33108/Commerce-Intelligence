@@ -94,7 +94,7 @@ address — the config server's — and learns everything else.
 ```mermaid
 flowchart TB
   classDef client fill:#fdf2f8,stroke:#be185d,color:#831843,stroke-width:2px;
-  classDef edge fill:#ede9fe,stroke:#6d28d9,color:#4c1d95,stroke-width:2px;
+  classDef gwedge fill:#ede9fe,stroke:#6d28d9,color:#4c1d95,stroke-width:2px;
   classDef ctrl fill:#e0f2fe,stroke:#0369a1,color:#075985,stroke-width:2px;
   classDef svc fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a,stroke-width:2px;
   classDef py fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:2px;
@@ -102,11 +102,11 @@ flowchart TB
   classDef bus fill:#fde68a,stroke:#a16207,color:#713f12,stroke-width:2px;
   classDef aux fill:#f1f5f9,stroke:#475569,color:#334155,stroke-width:2px;
 
-  BROWSER["Browser · React 19 storefront<br/>http://localhost:3000"]:::client
+  BROWSER["Browser · React 19 storefront<br/>localhost:3000"]:::client
   ADMIN["Admin · Analytics page<br/>SSE streamed answers"]:::client
 
   subgraph EDGEPLANE["Edge"]
-    GW["api-gateway :8080 · mgmt :9090<br/>Spring Cloud Gateway<br/>routes · JWT · CORS · Redis rate limit"]:::edge
+    GW["api-gateway :8080 · mgmt :9090<br/>Spring Cloud Gateway<br/>routes · JWT · CORS · Redis rate limit"]:::gwedge
   end
 
   subgraph CONTROLPLANE["Control plane"]
@@ -133,40 +133,36 @@ flowchart TB
     ES[("Elasticsearch 8<br/>product index<br/>ecommerce_agent_values")]:::aux
   end
 
-  BROWSER --> GW
-  ADMIN --> GW
-
-  CONFIG -. "spring.config.import<br/>the one fixed address" .-> GW
-  GW --> EUREKA
-  ORD -. "register + heartbeat · every service" .-> EUREKA
-
-  GW -- "lb://user-service" --> USER
-  GW -- "lb://catalog-service" --> CAT
-  GW -- "lb://inventory-service" --> INV
-  GW -- "lb://order-service" --> ORD
-  GW -- "lb://payment-service" --> PAY
-  GW -- "lb://search-service" --> SRCH
-  GW -- "/api/analytics/* · fixed URI" --> AGENT
-
+  BROWSER -->|"HTTPS"| GW
+  ADMIN -->|"HTTPS"| GW
+  CONFIG -.->|"spring.config.import<br/>the one fixed address"| GW
+  GW -->|"lookup"| EUREKA
+  ORD -.->|"register + heartbeat<br/>every service does this"| EUREKA
+  GW -->|"lb://user-service"| USER
+  GW -->|"lb://catalog-service"| CAT
+  GW -->|"lb://inventory-service"| INV
+  GW -->|"lb://order-service"| ORD
+  GW -->|"lb://payment-service"| PAY
+  GW -->|"lb://search-service"| SRCH
+  GW -->|"fixed URI, not lb"| AGENT
   USER --> PG
   CAT --> PG
   INV --> PG
   ORD --> PG
   PAY --> PG
-
   CAT --> REDIS
   USER --> REDIS
   ORD --> REDIS
   GW --> REDIS
   SRCH --> ES
-  ORD -- "outbox relay publishes" --> KAFKA
-  CAT -- "outbox relay publishes" --> KAFKA
-  KAFKA -- "@KafkaListener" --> SRCH
+  ORD -->|"outbox relay publishes"| KAFKA
+  CAT -->|"outbox relay publishes"| KAFKA
+  KAFKA -->|"@KafkaListener"| SRCH
   KAFKA --> INV
   KAFKA --> PAY
   AGENT --> MYSQL
 
-  linkStyle 0,1 stroke:#be185d;
+  linkStyle 0,1 stroke:#be185d,stroke-width:2px;
   linkStyle 2 stroke:#0369a1,stroke-dasharray:4 3;
 ```
 
@@ -227,28 +223,32 @@ flowchart LR
   AGENTQ["NL→SQL agent<br/>retrieval → generation → EXPLAIN → execute"]:::consumer
   USERQ["Analyst / admin<br/>GET /api/analytics/query"]:::consumer
 
+  NOTE["paymentdb stays transactional<br/>no warehouse measure depends on it"]:::cdc
+
   CDB --> DEB
   UDB --> DEB
   ODB --> DEB
-  DEB --> T1 & T2 & T3 & T4
-  PDB -. "not captured by CDC" .-> NOTE["paymentdb stays transactional —<br/>no warehouse measure depends on it"]:::cdc
-
+  DEB --> T1
+  DEB --> T2
+  DEB --> T3
+  DEB --> T4
+  PDB -.->|"not captured by CDC"| NOTE
   T1 --> SINK
   T2 --> SINK
   T3 --> SINK
   T4 --> SINK
-
-  SINK --> DIMP & DIMC & FACT
+  SINK --> DIMP
+  SINK --> DIMC
   SINK --> DIM_G
-  DIMD -. "seeded by 02_seed_dimensions.sql" .-> FACT
-
+  SINK --> FACT
+  DIMD -.->|"seeded by 02_seed_dimensions.sql"| FACT
   META --> AGENTQ
   FACT --> AGENTQ
   DIMD --> AGENTQ
   DIMP --> AGENTQ
   DIMC --> AGENTQ
   DIM_G --> AGENTQ
-  RO -. "the only credential" .-> AGENTQ
+  RO -.->|"the only credential"| AGENTQ
   USERQ --> AGENTQ
 
   linkStyle 7 stroke:#c2410c,stroke-dasharray:4 3;
@@ -295,7 +295,7 @@ flowchart TB
     TOOL3["get_table_schema(table_name)"]:::mcp
   end
 
-  GW["api-gateway :8080<br/>rewrites /api/analytics to /api<br/>RewritePath · RemoveResponseHeader=Content-Length<br/>response-timeout 120 s · JWT enforced at the edge"]:::gw
+  GW["api-gateway :8080<br/>rewrites /api/analytics to /api<br/>strips Content-Length so SSE is not buffered<br/>response-timeout 120 s · JWT enforced at the edge"]:::gw
 
   subgraph BACKEND["agent/backend — analytics-agent :8000 (FastAPI)"]
     EP["POST /api/query (SSE)<br/>GET /api/tables · /api/schema/... · /health"]:::api
@@ -323,19 +323,26 @@ flowchart TB
 
   SPA --> GW
   EVAL --> GW
-  MCPC -- "MCP over stdio" --> TOOL1 & TOOL2 & TOOL3
-  TOOL1 -- "POST /api/query<br/>collects SSE frames → markdown" --> EP
-  TOOL2 -- "GET /api/tables" --> EP
-  TOOL3 -- "GET /api/schema/..." --> EP
-  GW --> EP
-  EP --> N1 --> N2 --> N3 --> N4 --> N5
+  MCPC -->|"MCP over stdio"| TOOL1
+  MCPC -->|"MCP over stdio"| TOOL2
+  MCPC -->|"MCP over stdio"| TOOL3
+  TOOL1 -->|"POST /api/query, SSE frames to markdown"| EP
+  TOOL2 -->|"GET /api/tables"| EP
+  TOOL3 -->|"GET /api/schema"| EP
+  GW -->|"JWT + RewritePath"| EP
+  EP --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> N4
+  N4 --> N5
   N5 --> DW
-
-  N2 --> TEI --> QDR
+  N2 --> TEI
+  TEI --> QDR
   N2 --> ESV
   N3 --> METADB
   N2 --> RDS
-  N4 --> PROMPT --> GEM
+  N4 --> PROMPT
+  PROMPT --> GEM
   N5 --> GEM
   EP --> LOGS
 
@@ -364,30 +371,38 @@ flowchart TD
   S(["user question"]):::entry
   EK["extract_keywords"]:::rec
   RC["recall_column<br/>Qdrant vectors"]:::rec
-  RV["recall_value<br/>Elasticsearch values — 'Sao Paulo' → dim_geography.state_name"]:::rec
+  RV["recall_value<br/>Elasticsearch resolves a value, not a column:<br/>Sao Paulo lands on dim_geography.state_name"]:::rec
   RM["recall_metric<br/>Qdrant metric vectors"]:::rec
   MG["merge_retrieved_info"]:::rec
   FT["filter_table<br/>LLM prunes the schema"]:::rec
   FM["filter_metric<br/>LLM prunes the metrics"]:::rec
   XC["add_extra_context<br/>db dialect · current date"]:::gen
   GS["generate_sql"]:::gen
-  VS{"validate_sql<br/>single SELECT + EXPLAIN"}:::gen
+  VS{"validate_sql<br/>single SELECT, then EXPLAIN"}:::gen
   CS["correct_sql"]:::gen
   EX["execute_sql"]:::term
   FA["fail_sql"]:::term
-  E(["SSE: progress → sql → result"]):::term
+  E(["SSE stream: progress, sql, result"]):::term
 
   S --> EK
-  EK --> RC & RV & RM
+  EK --> RC
+  EK --> RV
+  EK --> RM
   RC --> MG
   RV --> MG
   RM --> MG
-  MG --> FT --> XC
-  MG --> FM --> XC
-  XC --> GS --> VS
-  VS -- "no error" --> EX --> E
-  VS -- "error, fewer than 3 attempts" --> CS --> VS
-  VS -- "error, 3 attempts spent" --> FA --> E
+  MG --> FT
+  MG --> FM
+  FT --> XC
+  FM --> XC
+  XC --> GS
+  GS --> VS
+  VS -->|"no error"| EX
+  EX --> E
+  VS -->|"error, fewer than 3 attempts"| CS
+  CS --> VS
+  VS -->|"error, 3 attempts spent"| FA
+  FA --> E
 ```
 
 ---
